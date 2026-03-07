@@ -29,6 +29,7 @@ services:
       - "127.0.0.1:3003:3003"
     volumes:
       - /home/sotto/.claude:/home/node/.claude
+      - analytics-data:/app/data
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/fairtrail
       REDIS_URL: redis://redis:6379
@@ -45,3 +46,4 @@ services:
 volumes:
   pgdata:
   redisdata:
+  analytics-data:

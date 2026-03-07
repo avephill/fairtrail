@@ -1,14 +1,14 @@
 FROM node:22-alpine AS deps
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat openssl python3 make g++
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
 COPY apps/web/prisma ./apps/web/prisma/
-RUN npm ci --ignore-scripts
+RUN npm ci
 RUN npx prisma generate --schema=apps/web/prisma/schema.prisma
 
 FROM node:22-alpine AS builder
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat openssl python3 make g++
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -40,6 +40,8 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 
 # Prisma schema + generated client (for migrations in entrypoint)
 COPY --from=builder --chown=node:node /app/apps/web/prisma ./apps/web/prisma
+
+RUN mkdir -p /app/data && chown node:node /app/data
 
 COPY --chown=node:node docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
