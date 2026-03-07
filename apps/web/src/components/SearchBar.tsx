@@ -371,6 +371,7 @@ export function SearchBar() {
           flights={previewFlights}
           onTrack={handleTrackSelected}
           onBack={handleBackFromPicker}
+          onEdit={handleReset}
           loading={loading}
         />
       )}

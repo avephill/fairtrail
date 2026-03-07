@@ -16,11 +16,13 @@ export function FlightPicker({
   flights,
   onTrack,
   onBack,
+  onEdit,
   loading,
 }: {
   flights: PriceData[];
   onTrack: (selected: PriceData[]) => void;
   onBack: () => void;
+  onEdit: () => void;
   loading: boolean;
 }) {
   const [selected, setSelected] = useState<Set<number>>(
@@ -124,6 +126,13 @@ export function FlightPicker({
           disabled={loading}
         >
           Back
+        </button>
+        <button
+          className={styles.backButton}
+          onClick={onEdit}
+          disabled={loading}
+        >
+          Edit search
         </button>
       </div>
     </div>
