@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { PriceChart } from '@/components/PriceChart';
@@ -8,6 +9,26 @@ import styles from './page.module.css';
 
 interface Props {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const query = await prisma.query.findUnique({ where: { id } });
+
+  if (!query) return {};
+
+  const title = `${query.originName} to ${query.destinationName} Flight Prices`;
+  const dateRange = `${formatDate(query.dateFrom)} - ${formatDate(query.dateTo)}`;
+  const description = `Track ${query.origin} → ${query.destination} flight prices (${dateRange}). See price history, compare airlines, and book at the right moment.`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+    },
+  };
 }
 
 function formatDate(d: Date): string {
@@ -66,8 +87,32 @@ export default async function ChartPage({ params }: Props) {
     scrapedAt: s.scrapedAt.toISOString(),
   }));
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebPage',
+        name: `${query.originName} to ${query.destinationName} Flight Prices`,
+        description: `Flight price tracker for ${query.origin} → ${query.destination}`,
+        url: `https://fairtrail.org/q/${id}`,
+        isPartOf: { '@type': 'WebSite', name: 'Fairtrail', url: 'https://fairtrail.org' },
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://fairtrail.org' },
+          { '@type': 'ListItem', position: 2, name: `${query.origin} → ${query.destination}`, item: `https://fairtrail.org/q/${id}` },
+        ],
+      },
+    ],
+  };
+
   return (
     <main className={styles.root}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className={styles.themeToggle}>
         <ThemeToggle />
       </div>
