@@ -1,20 +1,24 @@
-import type { Query } from '@prisma/client';
+export interface FlightSearchParams {
+  origin: string;
+  destination: string;
+  dateFrom: Date;
+  dateTo: Date;
+}
 
 interface NavigationResult {
   html: string;
   url: string;
 }
 
-function buildGoogleFlightsUrl(query: Query): string {
-  const dateFrom = query.dateFrom.toISOString().split('T')[0];
-  const dateTo = query.dateTo.toISOString().split('T')[0];
+function buildGoogleFlightsUrl(params: FlightSearchParams): string {
+  const dateFrom = params.dateFrom.toISOString().split('T')[0];
+  const dateTo = params.dateTo.toISOString().split('T')[0];
 
-  // Google Flights URL format: /flights/origin-destination/dateFrom/dateTo
-  return `https://www.google.com/travel/flights?q=flights+from+${query.origin}+to+${query.destination}+on+${dateFrom}+to+${dateTo}&curr=USD&hl=en`;
+  return `https://www.google.com/travel/flights?q=flights+from+${params.origin}+to+${params.destination}+on+${dateFrom}+to+${dateTo}&curr=USD&hl=en`;
 }
 
 export async function navigateGoogleFlights(
-  query: Query
+  params: FlightSearchParams
 ): Promise<NavigationResult> {
   const { chromium } = await import('playwright');
 
@@ -38,7 +42,7 @@ export async function navigateGoogleFlights(
     });
 
     const page = await context.newPage();
-    const url = buildGoogleFlightsUrl(query);
+    const url = buildGoogleFlightsUrl(params);
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
 
     // Wait for flight results to load

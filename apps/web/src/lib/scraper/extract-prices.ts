@@ -19,9 +19,9 @@ export interface QueryFilters {
   cabinClass: string;
 }
 
-const MAX_RESULTS = 10;
+const DEFAULT_MAX_RESULTS = 10;
 
-function buildSystemPrompt(filters: QueryFilters): string {
+function buildSystemPrompt(filters: QueryFilters, maxResults: number): string {
   const filterRules: string[] = [];
 
   if (filters.maxPrice) {
@@ -53,7 +53,7 @@ function buildSystemPrompt(filters: QueryFilters): string {
 
   return `You are a flight price data extractor. Given HTML from a Google Flights search results page, extract the best matching flight options.
 
-Return ONLY valid JSON — an array of UP TO ${MAX_RESULTS} objects with this exact shape:
+Return ONLY valid JSON — an array of UP TO ${maxResults} objects with this exact shape:
 [
   {
     "travelDate": "YYYY-MM-DD",
@@ -67,13 +67,13 @@ Return ONLY valid JSON — an array of UP TO ${MAX_RESULTS} objects with this ex
 ]
 ${filterSection}
 General rules:
-- Return at most ${MAX_RESULTS} results, sorted by price (cheapest first)
+- Return at most ${maxResults} results, sorted by price (cheapest first)
 - Price must be a number (no $ sign, no commas)
 - If you can't find a direct booking URL, construct one from the Google Flights URL
 - stops: 0 for nonstop, 1 for 1 stop, etc.
 - duration: human-readable format like "8h 30m"
 - If the travel date is not clearly visible per result, use the search date provided
-- Prefer variety: if multiple airlines are available, include at least one from each (up to the ${MAX_RESULTS} limit)
+- Prefer variety: if multiple airlines are available, include at least one from each (up to the ${maxResults} limit)
 - Return ONLY the JSON array, no markdown, no explanation
 - If you cannot extract any flights, return an empty array []`;
 }
@@ -82,7 +82,8 @@ export async function extractPrices(
   html: string,
   searchUrl: string,
   travelDateFallback: string,
-  filters: QueryFilters = { maxPrice: null, maxStops: null, preferredAirlines: [], timePreference: 'any', cabinClass: 'economy' }
+  filters: QueryFilters = { maxPrice: null, maxStops: null, preferredAirlines: [], timePreference: 'any', cabinClass: 'economy' },
+  maxResults: number = DEFAULT_MAX_RESULTS
 ): Promise<{ prices: PriceData[]; usage: ExtractionUsage }> {
   const config = await prisma.extractionConfig.findFirst({
     where: { id: 'singleton' },
@@ -110,7 +111,7 @@ Default travel date (if not visible per result): ${travelDateFallback}
 HTML content:
 ${trimmedHtml}`;
 
-  const systemPrompt = buildSystemPrompt(filters);
+  const systemPrompt = buildSystemPrompt(filters, maxResults);
   const result = await providerConfig.extract(apiKey, model, systemPrompt, userPrompt);
 
   const jsonMatch = result.content.match(/\[[\s\S]*\]/);

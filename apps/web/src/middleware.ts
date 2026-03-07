@@ -35,6 +35,8 @@ const GATE_EXEMPT = [
   '/api/gate',
   '/q/',
   '/api/queries/',
+  '/api/parse',
+  '/api/preview',
   '/admin',
   '/api/admin',
   '/api/health',

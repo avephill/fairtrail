@@ -50,11 +50,15 @@ export function ConfirmationCard({
   onTrack,
   onEdit,
   loading,
+  actionLabel = 'Search flights',
+  loadingLabel = 'Searching flights...',
 }: {
   parsed: ParsedQuery;
   onTrack: () => void;
   onEdit: () => void;
   loading: boolean;
+  actionLabel?: string;
+  loadingLabel?: string;
 }) {
   return (
     <div className={styles.root}>
@@ -125,7 +129,7 @@ export function ConfirmationCard({
           onClick={onTrack}
           disabled={loading}
         >
-          {loading ? 'Creating tracker...' : 'Track this flight'}
+          {loading ? loadingLabel : actionLabel}
         </button>
         <button
           className={styles.editButton}

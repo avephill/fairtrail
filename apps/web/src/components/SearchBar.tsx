@@ -2,10 +2,12 @@
 
 import { useState, useCallback, useRef } from 'react';
 import type { ParseAmbiguity, ParsedFlightQuery } from '@/lib/scraper/parse-query';
+import type { PriceData } from '@/lib/scraper/extract-prices';
 import { addSavedTracker } from '@/lib/tracker-storage';
 import styles from './SearchBar.module.css';
 import { ConfirmationCard, type ParsedQuery } from './ConfirmationCard';
 import { ClarificationCard } from './ClarificationCard';
+import { FlightPicker } from './FlightPicker';
 import { LinkBanner } from './LinkBanner';
 
 interface ConversationMessage {
@@ -32,6 +34,9 @@ export function SearchBar() {
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [ambiguities, setAmbiguities] = useState<ParseAmbiguity[]>([]);
   const [partialParsed, setPartialParsed] = useState<ParsedFlightQuery | null>(null);
+
+  // Preview state
+  const [previewFlights, setPreviewFlights] = useState<PriceData[] | null>(null);
 
   // Link banner state
   const [createdQuery, setCreatedQuery] = useState<CreatedQuery | null>(null);
@@ -87,6 +92,7 @@ export function SearchBar() {
     setAmbiguities([]);
     setPartialParsed(null);
     setParsed(null);
+    setPreviewFlights(null);
 
     await doParse(trimmed, history);
   }, [query, doParse]);
@@ -103,15 +109,49 @@ export function SearchBar() {
     }
   };
 
-  const handleTrack = async () => {
+  const handlePreview = async () => {
     if (!parsed) return;
 
     setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(parsed),
+      });
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        setError(data.error || 'Failed to search flights');
+        return;
+      }
+
+      setPreviewFlights(data.data.flights);
+    } catch {
+      setError('Network error — please try again');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTrackSelected = async (selectedFlights: PriceData[]) => {
+    if (!parsed) return;
+
+    setLoading(true);
+    setError(null);
+
     try {
       const res = await fetch('/api/queries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...parsed, rawInput: query.trim() }),
+        body: JSON.stringify({
+          ...parsed,
+          rawInput: query.trim(),
+          selectedFlights,
+        }),
       });
 
       const data = await res.json();
@@ -121,7 +161,6 @@ export function SearchBar() {
         return;
       }
 
-      // Save to localStorage
       addSavedTracker({
         id: data.data.id,
         origin: parsed.origin,
@@ -133,7 +172,6 @@ export function SearchBar() {
         createdAt: new Date().toISOString(),
       });
 
-      // Show link banner instead of redirecting
       setCreatedQuery({
         id: data.data.id,
         origin: parsed.origin,
@@ -148,17 +186,24 @@ export function SearchBar() {
     }
   };
 
+  const handleBackFromPicker = () => {
+    setPreviewFlights(null);
+  };
+
   const handleReset = () => {
     setParsed(null);
     setError(null);
     setConversation([]);
     setAmbiguities([]);
     setPartialParsed(null);
+    setPreviewFlights(null);
     setCreatedQuery(null);
     inputRef.current?.focus();
   };
 
   const showClarification = ambiguities.length > 0 && !parsed;
+  const showConfirmation = parsed && !previewFlights && !createdQuery;
+  const showPicker = parsed && previewFlights && !createdQuery;
 
   return (
     <div className={styles.root}>
@@ -213,11 +258,20 @@ export function SearchBar() {
         />
       )}
 
-      {parsed && !createdQuery && (
+      {showConfirmation && (
         <ConfirmationCard
           parsed={parsed}
-          onTrack={handleTrack}
+          onTrack={handlePreview}
           onEdit={handleReset}
+          loading={loading}
+        />
+      )}
+
+      {showPicker && (
+        <FlightPicker
+          flights={previewFlights}
+          onTrack={handleTrackSelected}
+          onBack={handleBackFromPicker}
           loading={loading}
         />
       )}
