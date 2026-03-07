@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['playwright'],
+  serverExternalPackages: ['playwright', 'better-sqlite3', 'geoip-lite'],
 };
 
 export default nextConfig;

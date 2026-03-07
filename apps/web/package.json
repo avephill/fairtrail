@@ -13,6 +13,8 @@
     "@anthropic-ai/sdk": "^0.78.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.4.1",
+    "better-sqlite3": "^12.6.2",
+    "geoip-lite": "^1.4.10",
     "ioredis": "^5.4.2",
     "next": "^15.2.3",
     "openai": "^6.27.0",
@@ -20,10 +22,14 @@
     "plotly.js-dist-min": "^2.35.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-plotly.js": "^2.6.0"
+    "react-plotly.js": "^2.6.0",
+    "recharts": "^3.8.0",
+    "ua-parser-js": "^2.0.9"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/geoip-lite": "^1.4.4",
     "@types/node": "^22.13.10",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
