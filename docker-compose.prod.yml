@@ -27,6 +27,8 @@ services:
       - redis
     ports:
       - "127.0.0.1:3003:3003"
+    volumes:
+      - /home/sotto/.claude:/home/node/.claude
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/fairtrail
       REDIS_URL: redis://redis:6379

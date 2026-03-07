@@ -18,30 +18,31 @@ RUN npm run build --workspace=@fairtrail/web
 
 FROM node:22-alpine AS runner
 RUN apk add --no-cache libc6-compat openssl chromium
+RUN npm install -g @anthropic-ai/claude-code
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3003
 ENV HOSTNAME="0.0.0.0"
 ENV CHROME_PATH=/usr/bin/chromium-browser
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+# Reuse the existing node user (UID 1000) to match host sotto user for .claude mount
+RUN mkdir -p /home/node/.claude && chown node:node /home/node/.claude
 WORKDIR /app
 
 # Full node_modules (standalone trace fails in monorepo)
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=deps --chown=node:node /app/node_modules ./node_modules
 
 # Standalone server + built app
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=node:node /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=node:node /app/apps/web/.next/static ./.next/static
+COPY --from=builder --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./public
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
 # Prisma schema + generated client (for migrations in entrypoint)
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/prisma ./apps/web/prisma
+COPY --from=builder --chown=node:node /app/apps/web/prisma ./apps/web/prisma
 
-COPY --chown=nextjs:nodejs docker-entrypoint.sh ./
+COPY --chown=node:node docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
-USER nextjs
+USER node
 EXPOSE 3003
 ENTRYPOINT ["./docker-entrypoint.sh"]
