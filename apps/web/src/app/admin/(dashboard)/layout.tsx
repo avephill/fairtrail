@@ -8,6 +8,7 @@ import styles from './layout.module.css';
 const NAV_ITEMS = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/queries', label: 'Queries' },
+  { href: '/admin/seed-routes', label: 'Seed Routes' },
   { href: '/admin/analytics', label: 'Analytics' },
   { href: '/admin/config', label: 'Config' },
 ];
