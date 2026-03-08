@@ -46,6 +46,25 @@ Every flight price tracker gives you "alert me when it's cheap." None of them le
 - **Direct booking links** — click any data point to go straight to the airline
 - **Airline comparison** — see which carriers are cheapening vs. getting expensive
 - **Self-hosted** — your data stays on your machine
+- **Agent-friendly API** — hook Claude Code, OpenClaw, Codex, or any agent into your instance
+
+## Community Data
+
+Fairtrail is **fully decentralized**. You run everything — scraping, LLM calls, storage — on your own machine. There is no central server doing work for you.
+
+**What fairtrail.org does:** aggregates anonymized price data that self-hosted instances **opt in** to share. Think of it as a community price database that grows as more people run Fairtrail.
+
+**What gets shared (opt-in only):**
+- Route (origin/destination airports)
+- Travel date, price, currency, airline, stops, cabin class
+- When the data was scraped
+
+**What is never shared:**
+- Your queries, search history, or preferences
+- Your LLM API keys
+- Your IP address or identity
+
+Enable community sharing during the setup wizard or later in `/admin → Config`. Explore community data at [fairtrail.org/explore](https://fairtrail.org/explore).
 
 ## LLM Providers
 
@@ -77,9 +96,66 @@ Copy `.env.example` to `.env` and configure:
 | `CRON_ENABLED` | | `true` | Enable built-in scrape scheduler |
 | `CRON_INTERVAL_HOURS` | | `6` | Hours between scrape runs |
 | `REDIS_URL` | | Set by compose | Optional — app works without Redis |
+| `COMMUNITY_HUB_URL` | | `https://fairtrail.org` | Hub for community data sharing |
 | `PORT` | | `3003` | Web server port |
 
 Secrets left empty are auto-generated on first run and printed in Docker logs.
+
+## Agent & CLI Integration
+
+Your local Fairtrail instance exposes a REST API that any agent, script, or CLI tool can use. No SDK needed — just HTTP calls to `localhost:3003`.
+
+See [`AGENTS.md`](AGENTS.md) for the full API reference.
+
+### Quick example
+
+```bash
+# 1. Parse a natural language query
+curl -s -X POST http://localhost:3003/api/parse \
+  -H "Content-Type: application/json" \
+  -d '{"query": "NYC to Paris around June 15 ± 3 days"}' | jq .
+
+# 2. Create a tracked query (use the parsed response)
+curl -s -X POST http://localhost:3003/api/queries \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rawInput": "NYC to Paris around June 15 ± 3 days",
+    "origin": "JFK", "originName": "New York JFK",
+    "destination": "CDG", "destinationName": "Paris CDG",
+    "dateFrom": "2026-06-12", "dateTo": "2026-06-18",
+    "flexibility": 3, "cabinClass": "economy",
+    "tripType": "round_trip", "routes": [...]
+  }' | jq .
+
+# 3. Trigger an immediate scrape
+curl -s http://localhost:3003/api/cron/scrape \
+  -H "Authorization: Bearer $CRON_SECRET" | jq .
+
+# 4. Get price data for a query
+curl -s http://localhost:3003/api/queries/{id}/prices | jq .
+```
+
+### Using with Claude Code
+
+Add your Fairtrail API to Claude Code's context so it can track flights for you:
+
+```bash
+# In your project's CLAUDE.md or conversation:
+"Track NYC to Paris flights for mid-June. Use the Fairtrail API at
+http://localhost:3003. See AGENTS.md for endpoints."
+```
+
+Claude Code will read `AGENTS.md`, understand the API, and make the calls.
+
+### Using with any agent (OpenClaw, Codex, custom)
+
+Any agent that can make HTTP requests works. Point it at your Fairtrail instance:
+
+1. Set `FAIRTRAIL_URL=http://localhost:3003` in the agent's environment
+2. Give it the `CRON_SECRET` if you want it to trigger scrapes
+3. Let it read `AGENTS.md` for the API schema
+
+The endpoints are auth-free in self-hosted mode (except scrape triggering, which needs `CRON_SECRET`).
 
 ## How It Works
 
@@ -139,17 +215,24 @@ fairtrail/
 │   ├── src/app/              # Pages + API routes
 │   │   ├── page.tsx          # Landing — natural language search bar
 │   │   ├── q/[id]/           # Public shareable chart page
+│   │   ├── explore/          # Community data explorer
 │   │   ├── setup/            # First-run setup wizard
 │   │   ├── admin/            # Admin panel (LLM config, queries, costs)
 │   │   └── api/              # REST endpoints
+│   │       ├── parse/        # LLM query parsing
+│   │       ├── queries/      # Query CRUD + price data
+│   │       ├── cron/         # Scrape trigger
+│   │       └── community/    # Registration + data ingest + routes
 │   ├── src/components/       # UI components (SearchBar, PriceChart, etc.)
 │   ├── src/lib/              # Core logic
 │   │   ├── scraper/          # Playwright + LLM extraction pipeline
+│   │   ├── community-sync.ts # Opt-in data sharing to fairtrail.org
 │   │   ├── cron.ts           # Built-in scrape scheduler
 │   │   ├── prisma.ts         # Database client
 │   │   ├── redis.ts          # Cache client (optional)
 │   │   └── admin-auth.ts     # Session management
 │   └── prisma/schema.prisma  # Database models
+├── AGENTS.md                 # API reference for agents & scripts
 ├── docker-compose.yml        # Self-hosted: PostgreSQL, Redis, web
 ├── docker-compose.prod.yml   # Production deployment
 ├── Dockerfile                # Multi-stage build with Chromium
