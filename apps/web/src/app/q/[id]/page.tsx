@@ -282,6 +282,8 @@ export default async function ChartPage({ params }: Props) {
         </div>
         <p>
           <a href="/">Fairtrail</a> — your data, not theirs
+          {' '}·{' '}
+          <a href="https://github.com/affromero/fairtrail" target="_blank" rel="noopener noreferrer">GitHub</a>
         </p>
       </footer>
     </main>

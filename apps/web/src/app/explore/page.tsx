@@ -126,6 +126,8 @@ export default async function ExplorePage() {
 
       <footer className={styles.footer}>
         <Link href="/">Fairtrail</Link> &mdash; community-powered price transparency
+        {' '}&middot;{' '}
+        <a href="https://github.com/affromero/fairtrail" target="_blank" rel="noopener noreferrer">GitHub</a>
       </footer>
     </main>
   );
