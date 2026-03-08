@@ -1,0 +1,17 @@
+import Link from 'next/link';
+import styles from './Footer.module.css';
+
+export function Footer() {
+  return (
+    <footer className={styles.root}>
+      <p className={styles.links}>
+        <Link href="/">Fairtrail</Link>
+        {' '}&mdash; your data, not theirs
+        {' '}&middot;{' '}
+        <Link href="/explore">Explore community data</Link>
+        {' '}&middot;{' '}
+        <a href="https://github.com/affromero/fairtrail" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </p>
+    </footer>
+  );
+}

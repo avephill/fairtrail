@@ -7,6 +7,7 @@ import { PriceHistory } from '@/components/PriceHistory';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { DeleteTracker } from '@/components/DeleteTracker';
+import { Footer } from '@/components/Footer';
 import styles from './page.module.css';
 
 interface Props {
@@ -272,20 +273,16 @@ export default async function ChartPage({ params }: Props) {
         </div>
       ))}
 
-      <footer className={styles.footer}>
+      <div className={styles.footerMeta}>
         <div className={styles.footerRow}>
-          <p>
+          <p className={styles.footerText}>
             Tracked since {formatDate(primary.query.createdAt)}
             {allQueries[0]?.lastRun && ` · Last checked ${timeAgo(allQueries[0].lastRun.startedAt)}`}
           </p>
           {!expired && <DeleteTracker queryId={id} />}
         </div>
-        <p>
-          <a href="/">Fairtrail</a> — your data, not theirs
-          {' '}·{' '}
-          <a href="https://github.com/affromero/fairtrail" target="_blank" rel="noopener noreferrer">GitHub</a>
-        </p>
-      </footer>
+      </div>
+      <Footer />
     </main>
   );
 }

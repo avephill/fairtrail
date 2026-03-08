@@ -4,6 +4,7 @@ import { SearchBar } from '@/components/SearchBar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SavedTrackers } from '@/components/SavedTrackers';
 import { SetupRedirect } from '@/components/SetupRedirect';
+import { Footer } from '@/components/Footer';
 import { getSessionToken, verifySessionToken } from '@/lib/admin-auth';
 
 export default async function HomePage() {
@@ -92,15 +93,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <footer className={styles.footer}>
-        <p>
-          Fairtrail &mdash; your data, not theirs
-          {' '}&middot;{' '}
-          <Link href="/explore">Explore community data</Link>
-          {' '}&middot;{' '}
-          <a href="https://github.com/affromero/fairtrail" target="_blank" rel="noopener noreferrer">GitHub</a>
-        </p>
-      </footer>
+      <Footer />
     </main>
   );
 }

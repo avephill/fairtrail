@@ -156,16 +156,12 @@
   width: 100%;
 }
 
-/* Footer */
-.footer {
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+/* Footer meta (page-specific tracking info above shared Footer) */
+.footerMeta {
+  padding: 1rem 1.5rem 0;
 }
 
-.footer p {
+.footerText {
   font-size: 0.8125rem;
   color: var(--muted);
   font-family: var(--font-mono);
@@ -177,10 +173,6 @@
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
-}
-
-.footer a {
-  color: var(--accent);
 }
 
 @media (max-width: 640px) {

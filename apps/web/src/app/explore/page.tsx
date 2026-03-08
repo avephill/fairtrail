@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { Footer } from '@/components/Footer';
 import styles from './page.module.css';
 
 interface RouteData {
@@ -124,11 +125,7 @@ export default async function ExplorePage() {
         </div>
       )}
 
-      <footer className={styles.footer}>
-        <Link href="/">Fairtrail</Link> &mdash; community-powered price transparency
-        {' '}&middot;{' '}
-        <a href="https://github.com/affromero/fairtrail" target="_blank" rel="noopener noreferrer">GitHub</a>
-      </footer>
+      <Footer />
     </main>
   );
 }

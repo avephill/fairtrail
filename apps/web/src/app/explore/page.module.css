@@ -171,15 +171,3 @@
   opacity: 0.85;
 }
 
-.footer {
-  text-align: center;
-  margin-top: 3rem;
-  padding: 1.5rem;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-}
-
-.footer a {
-  color: var(--accent);
-  text-decoration: none;
-}
