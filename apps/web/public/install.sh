@@ -387,7 +387,7 @@ if [ "$CLAUDE_CODE_DETECTED" = true ] || [ "$CODEX_DETECTED" = true ]; then
   echo -e "  ${DIM}Fairtrail needs read-only access to your CLI auth tokens:${RESET}"
   echo ""
   if [ "$CLAUDE_CODE_DETECTED" = true ]; then
-    echo -e "    ${DIM}~/.claude  →  mounted as read-only (:ro)${RESET}"
+    echo -e "    ${DIM}~/.claude.json + ~/.claude  →  mounted as read-only (:ro)${RESET}"
   fi
   if [ "$CODEX_DETECTED" = true ]; then
     echo -e "    ${DIM}~/.codex   →  mounted as read-only (:ro)${RESET}"
@@ -410,6 +410,10 @@ if [ "$MOUNT_CONSENT" = true ]; then
     NEED_OVERRIDE=true
     OVERRIDE_VOLUMES="${OVERRIDE_VOLUMES}
       - ${HOME}/.claude:/home/node/.claude:ro"
+    if [ -f "${HOME}/.claude.json" ]; then
+      OVERRIDE_VOLUMES="${OVERRIDE_VOLUMES}
+      - ${HOME}/.claude.json:/home/node/.claude.json:ro"
+    fi
   fi
 
   if [ "$CODEX_DETECTED" = true ]; then
