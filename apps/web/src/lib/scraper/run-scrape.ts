@@ -1,8 +1,25 @@
+import { mkdir, writeFile } from 'fs/promises';
 import { prisma } from '@/lib/prisma';
 import { navigateGoogleFlights, navigateAirlineDirect, type NavigationResult } from './navigate';
-import { extractPrices } from './extract-prices';
+import { extractPrices, type ExtractionFailureReason } from './extract-prices';
 import { getModelCosts } from './ai-registry';
 import { isKnownAirline } from './airline-urls';
+
+const RETRYABLE_FAILURES: ExtractionFailureReason[] = ['empty_extraction', 'page_not_loaded', 'no_json_in_response'];
+const MAX_EXTRACT_ATTEMPTS = 2;
+const DEBUG_DIR = '/tmp/fairtrail-debug';
+
+async function saveDebugHtml(queryId: string, html: string, attempt: number): Promise<void> {
+  try {
+    await mkdir(DEBUG_DIR, { recursive: true });
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const path = `${DEBUG_DIR}/${queryId}-attempt${attempt}-${ts}.html`;
+    await writeFile(path, html, 'utf-8');
+    console.log(`[scrape] saved debug HTML → ${path} (${html.length} chars)`);
+  } catch (err) {
+    console.log(`[scrape] failed to save debug HTML: ${err instanceof Error ? err.message : err}`);
+  }
+}
 
 interface ScrapeResult {
   queryId: string;
@@ -39,22 +56,6 @@ export async function runScrapeForQuery(queryId: string): Promise<ScrapeResult> 
     const directAirlines = query.preferredAirlines.filter(isKnownAirline);
     const useAirlineDirect = directAirlines.length > 0;
 
-    let navResults: NavigationResult[];
-    if (useAirlineDirect) {
-      // Scrape each known airline's site; fall back to Google Flights on failure
-      navResults = await Promise.all(
-        directAirlines.map(async (airline) => {
-          try {
-            return await navigateAirlineDirect(searchParams, airline);
-          } catch {
-            return navigateGoogleFlights(searchParams);
-          }
-        })
-      );
-    } else {
-      navResults = [await navigateGoogleFlights(searchParams)];
-    }
-
     const travelDateFallback = searchParams.dateFrom.toISOString().split('T')[0]!;
     const filters = {
       maxPrice: query.maxPrice,
@@ -76,15 +77,48 @@ export async function runScrapeForQuery(queryId: string): Promise<ScrapeResult> 
     let lastFailureReason: string | undefined;
     const sources = new Set<string>();
 
-    for (const nav of navResults) {
-      sources.add(nav.source);
-      const { prices, usage, failureReason } = await extractPrices(
-        nav.html, nav.url, travelDateFallback, filters, undefined, nav.resultsFound, nav.source
-      );
-      allPrices = allPrices.concat(prices);
-      totalInputTokens += usage.inputTokens;
-      totalOutputTokens += usage.outputTokens;
-      if (failureReason) lastFailureReason = failureReason;
+    async function navigateAll(): Promise<NavigationResult[]> {
+      if (useAirlineDirect) {
+        return Promise.all(
+          directAirlines.map(async (airline) => {
+            try {
+              return await navigateAirlineDirect(searchParams, airline);
+            } catch {
+              return navigateGoogleFlights(searchParams);
+            }
+          })
+        );
+      }
+      return [await navigateGoogleFlights(searchParams)];
+    }
+
+    for (let attempt = 1; attempt <= MAX_EXTRACT_ATTEMPTS; attempt++) {
+      console.log(`[scrape] query=${queryId} extract attempt ${attempt}/${MAX_EXTRACT_ATTEMPTS}`);
+
+      const navResults = await navigateAll();
+
+      for (const nav of navResults) {
+        sources.add(nav.source);
+        const { prices, usage, failureReason } = await extractPrices(
+          nav.html, nav.url, travelDateFallback, filters, undefined, nav.resultsFound, nav.source
+        );
+        allPrices = allPrices.concat(prices);
+        totalInputTokens += usage.inputTokens;
+        totalOutputTokens += usage.outputTokens;
+        if (failureReason) {
+          lastFailureReason = failureReason;
+          await saveDebugHtml(queryId, nav.html, attempt);
+        }
+      }
+
+      if (allPrices.length > 0) break;
+
+      // Retry only for transient failures
+      if (attempt < MAX_EXTRACT_ATTEMPTS && lastFailureReason && RETRYABLE_FAILURES.includes(lastFailureReason as ExtractionFailureReason)) {
+        const delay = 5000 + Math.random() * 5000;
+        console.log(`[scrape] query=${queryId} retrying after ${Math.round(delay)}ms (reason: ${lastFailureReason})`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
     }
 
     // Deduplicate by airline + price + date
@@ -180,6 +214,7 @@ export async function runScrapeForQuery(queryId: string): Promise<ScrapeResult> 
     }
 
     // Build error message for 0-result runs
+    console.log(`[scrape] query=${queryId} finished — ${allPrices.length} prices, cost=$${extractionCost.toFixed(4)}`);
     const failureReason = allPrices.length === 0 ? lastFailureReason : undefined;
     const failureMessages: Record<string, string> = {
       page_not_loaded: 'Page did not load results — blocked, CAPTCHA, or timeout.',
@@ -269,6 +304,8 @@ export async function runScrapeAll(): Promise<ScrapeResult[]> {
   });
 
   const results: ScrapeResult[] = [];
+
+  console.log(`[scrape-all] ${dueQueries.length}/${activeQueries.length} queries due for scraping`);
 
   // Run sequentially to avoid overwhelming Google Flights
   for (const query of dueQueries) {

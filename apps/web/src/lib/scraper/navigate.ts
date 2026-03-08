@@ -30,45 +30,63 @@ function buildGoogleFlightsUrl(params: FlightSearchParams): string {
 export async function navigateGoogleFlights(
   params: FlightSearchParams
 ): Promise<NavigationResult> {
-  const browser = await launchBrowser();
+  const url = buildGoogleFlightsUrl(params);
+  const maxAttempts = 2;
 
-  try {
-    const context = await createStealthContext(browser);
-    const page = await context.newPage();
-    const url = buildGoogleFlightsUrl(params);
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const browser = await launchBrowser();
 
-    // Wait for flight results to load
-    await page.waitForTimeout(3000);
-
-    // Dismiss consent/cookie dialog — Google renders two identical "Accept all"
-    // buttons; without .first() Playwright strict mode throws on the ambiguity
     try {
-      const consentButton = page.locator('button:has-text("Accept all")').first();
-      if (await consentButton.isVisible({ timeout: 2000 })) {
-        await consentButton.click();
-        await page.waitForTimeout(3000);
+      const context = await createStealthContext(browser);
+      const page = await context.newPage();
+      console.log(`[navigate] attempt ${attempt}/${maxAttempts} → ${url}`);
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
+
+      // Wait for flight results to load — longer on retries
+      await page.waitForTimeout(attempt === 1 ? 3000 : 6000);
+
+      // Dismiss consent/cookie dialog — Google renders two identical "Accept all"
+      // buttons; without .first() Playwright strict mode throws on the ambiguity
+      try {
+        const consentButton = page.locator('button:has-text("Accept all")').first();
+        if (await consentButton.isVisible({ timeout: 2000 })) {
+          await consentButton.click();
+          await page.waitForTimeout(3000);
+        }
+      } catch {
+        // No consent dialog — continue
       }
-    } catch {
-      // No consent dialog — continue
+
+      // Wait for flight results — look for price elements
+      let resultsFound = false;
+      try {
+        await page.waitForSelector('[data-gs]', { timeout: 15_000 });
+        resultsFound = true;
+      } catch {
+        // Selector not found — page may be blocked, CAPTCHA'd, or empty
+      }
+
+      const html = await page.content();
+      console.log(`[navigate] attempt ${attempt}: resultsFound=${resultsFound}, htmlLength=${html.length}`);
+
+      await context.close();
+
+      // Retry with fresh browser if no results and we have attempts left
+      if (!resultsFound && attempt < maxAttempts) {
+        console.log(`[navigate] no results on attempt ${attempt}, retrying after delay…`);
+        await browser.close();
+        await new Promise((r) => setTimeout(r, 3000 + Math.random() * 4000));
+        continue;
+      }
+
+      return { html, url, resultsFound, source: 'google_flights' };
+    } finally {
+      await browser.close();
     }
-
-    // Wait for flight results — look for price elements
-    let resultsFound = false;
-    try {
-      await page.waitForSelector('[data-gs]', { timeout: 15_000 });
-      resultsFound = true;
-    } catch {
-      // Selector not found — page may be blocked, CAPTCHA'd, or empty
-    }
-
-    const html = await page.content();
-
-    await context.close();
-    return { html, url, resultsFound, source: 'google_flights' };
-  } finally {
-    await browser.close();
   }
+
+  // Unreachable — loop always returns — but TypeScript needs it
+  throw new Error('navigateGoogleFlights: exhausted all attempts');
 }
 
 export interface FlightDetailResult {

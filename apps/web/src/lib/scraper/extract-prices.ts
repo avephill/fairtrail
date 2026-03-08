@@ -115,6 +115,7 @@ export async function extractPrices(
   source: NavigationSource = 'google_flights'
 ): Promise<ExtractionResult> {
   if (!resultsFound) {
+    console.log(`[extract] skipped — page did not load results (source=${source})`);
     return { prices: [], usage: { inputTokens: 0, outputTokens: 0 }, failureReason: 'page_not_loaded' };
   }
 
@@ -137,6 +138,7 @@ export async function extractPrices(
 
   // Trim HTML to reduce token usage — keep only the main content area
   const trimmedHtml = trimFlightHtml(html);
+  console.log(`[extract] sending ${trimmedHtml.length} chars to ${provider}/${model} (raw html: ${html.length})`);
 
   const userPrompt = `Search URL: ${searchUrl}
 Default travel date (if not visible per result): ${travelDateFallback}
@@ -149,12 +151,14 @@ ${trimmedHtml}`;
 
   const jsonMatch = result.content.match(/\[[\s\S]*\]/);
   if (!jsonMatch) {
+    console.log(`[extract] FAIL no_json_in_response — LLM returned no parseable JSON`);
     return { prices: [], usage: result.usage, failureReason: 'no_json_in_response' };
   }
 
   const raw = JSON.parse(jsonMatch[0]) as PriceData[];
 
   if (raw.length === 0) {
+    console.log(`[extract] FAIL empty_extraction — LLM returned [] (${result.usage.inputTokens} input tokens)`);
     return { prices: [], usage: result.usage, failureReason: 'empty_extraction' };
   }
 
@@ -164,9 +168,11 @@ ${trimmedHtml}`;
   );
 
   if (prices.length === 0) {
+    console.log(`[extract] FAIL all_filtered_out — ${raw.length} raw results all invalid`);
     return { prices: [], usage: result.usage, failureReason: 'all_filtered_out' };
   }
 
+  console.log(`[extract] OK — ${prices.length} flights extracted (cheapest: $${prices[0]?.price})`);
   return { prices, usage: result.usage };
 }
 
