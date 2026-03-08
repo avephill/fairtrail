@@ -11,17 +11,23 @@ export async function GET() {
     checks.database = 'error';
   }
 
-  try {
-    await redis.ping();
-    checks.redis = 'connected';
-  } catch {
-    checks.redis = 'error';
+  if (redis) {
+    try {
+      await redis.ping();
+      checks.redis = 'connected';
+    } catch {
+      checks.redis = 'error';
+    }
+  } else {
+    checks.redis = 'disabled';
   }
 
-  const allHealthy = Object.values(checks).every((v) => v === 'connected');
+  const healthy =
+    checks.database === 'connected' &&
+    (checks.redis === 'connected' || checks.redis === 'disabled');
 
   return Response.json(
-    { status: allHealthy ? 'ok' : 'degraded', ...checks },
-    { status: allHealthy ? 200 : 503 }
+    { status: healthy ? 'ok' : 'degraded', ...checks },
+    { status: healthy ? 200 : 503 }
   );
 }

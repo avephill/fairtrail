@@ -271,6 +271,15 @@ export async function cleanupUnvisitedQueries(): Promise<number> {
   return result.count;
 }
 
+async function trySyncToHub(): Promise<void> {
+  try {
+    const { syncToHub } = await import(/* webpackIgnore: true */ '../community-sync');
+    await syncToHub();
+  } catch (err) {
+    console.error('[community] Sync error:', err instanceof Error ? err.message : err);
+  }
+}
+
 export async function runScrapeAll(): Promise<ScrapeResult[]> {
   // Get global scrape interval default
   const config = await prisma.extractionConfig.findFirst({ where: { id: 'singleton' } });
@@ -317,6 +326,9 @@ export async function runScrapeAll(): Promise<ScrapeResult[]> {
       await new Promise((resolve) => setTimeout(resolve, 5000 + Math.random() * 5000));
     }
   }
+
+  // Sync to community hub if opted in
+  await trySyncToHub();
 
   return results;
 }

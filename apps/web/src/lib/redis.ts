@@ -1,13 +1,22 @@
 import Redis from 'ioredis';
 
-const globalForRedis = globalThis as unknown as { redis: Redis };
+const REDIS_ENABLED = Boolean(process.env.REDIS_URL);
 
-export const redis =
-  globalForRedis.redis ||
-  new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+const globalForRedis = globalThis as unknown as { redis: Redis | null };
+
+function createRedisClient(): Redis | null {
+  if (!REDIS_ENABLED) return null;
+
+  return new Redis(process.env.REDIS_URL!, {
     lazyConnect: true,
     maxRetriesPerRequest: 3,
   });
+}
+
+export const redis: Redis | null =
+  globalForRedis.redis !== undefined
+    ? globalForRedis.redis
+    : createRedisClient();
 
 if (process.env.NODE_ENV !== 'production') {
   globalForRedis.redis = redis;
@@ -20,19 +29,23 @@ export async function cached<T>(
   fn: () => Promise<T>,
   ttl = CACHE_TTL
 ): Promise<T> {
-  try {
-    const hit = await redis.get(key);
-    if (hit) return JSON.parse(hit) as T;
-  } catch {
-    // Redis unavailable — fall through to fn
+  if (redis) {
+    try {
+      const hit = await redis.get(key);
+      if (hit) return JSON.parse(hit) as T;
+    } catch {
+      // Redis unavailable — fall through to fn
+    }
   }
 
   const result = await fn();
 
-  try {
-    await redis.set(key, JSON.stringify(result), 'EX', ttl);
-  } catch {
-    // Redis unavailable — ignore
+  if (redis) {
+    try {
+      await redis.set(key, JSON.stringify(result), 'EX', ttl);
+    } catch {
+      // Redis unavailable — ignore
+    }
   }
 
   return result;

@@ -10,6 +10,8 @@ interface Config {
   enabled: boolean;
   scrapeInterval: number;
   hasAdminPassword: boolean;
+  communitySharing: boolean;
+  communityApiKey: string | null;
 }
 
 interface InviteCode {
@@ -293,6 +295,46 @@ export default function ConfigPage() {
           </button>
           {passwordMessage && <span className={styles.message}>{passwordMessage}</span>}
         </div>
+      </div>
+
+      <div className={styles.form}>
+        <h2 className={styles.sectionTitle}>Community Data Sharing</h2>
+
+        <div className={styles.toggleRow}>
+          <button
+            type="button"
+            className={`${styles.toggle} ${config.communitySharing ? styles.toggleOn : ''}`}
+            onClick={async () => {
+              const newValue = !config.communitySharing;
+              const res = await fetch('/api/admin/config', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ communitySharing: newValue }),
+              });
+              const data = await res.json();
+              if (data.ok) setConfig(data.data);
+            }}
+          >
+            <span className={styles.toggleKnob} />
+          </button>
+          <div>
+            <span className={styles.toggleLabel}>
+              {config.communitySharing ? 'Sharing enabled' : 'Sharing disabled'}
+            </span>
+            <p className={styles.toggleHint}>
+              Share anonymized price data (route, price, airline, date) with the Fairtrail community.
+            </p>
+          </div>
+        </div>
+
+        {config.communityApiKey && (
+          <div className={styles.field}>
+            <label className={styles.label}>API Key</label>
+            <code className={styles.code}>
+              {config.communityApiKey.slice(0, 8)}...{config.communityApiKey.slice(-4)}
+            </code>
+          </div>
+        )}
       </div>
 
       <div className={styles.info}>

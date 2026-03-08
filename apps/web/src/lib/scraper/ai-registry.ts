@@ -176,7 +176,76 @@ export const EXTRACTION_PROVIDERS: Record<string, ProviderConfig> = {
       };
     },
   },
+  codex: {
+    displayName: 'OpenAI Codex (CLI)',
+    envKey: 'CODEX_ENABLED',
+    models: [
+      { id: 'codex', name: 'Codex CLI', costPer1kInput: 0, costPer1kOutput: 0 },
+    ],
+    extract: async (_apiKey, _model, systemPrompt, userPrompt) => {
+      const { spawn } = await import(/* webpackIgnore: true */ 'child_process');
+
+      const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
+
+      const result = await new Promise<string>((resolve, reject) => {
+        const proc = spawn('codex', ['--print'], {
+          timeout: 240_000,
+        });
+
+        let stdout = '';
+        let stderr = '';
+        proc.stdout.on('data', (d: Buffer) => {
+          stdout += d.toString();
+        });
+        proc.stderr.on('data', (d: Buffer) => {
+          stderr += d.toString();
+        });
+        proc.on('close', (code) => {
+          if (code !== 0) reject(new Error(`codex CLI exited ${code}: ${stderr}`));
+          else resolve(stdout.trim());
+        });
+        proc.on('error', reject);
+        proc.stdin.write(fullPrompt);
+        proc.stdin.end();
+      });
+
+      return {
+        content: result,
+        usage: { inputTokens: 0, outputTokens: 0 },
+      };
+    },
+  },
 };
+
+const CLI_PROVIDERS: Record<string, string> = {
+  'claude-code': 'claude',
+  codex: 'codex',
+};
+
+export async function detectAvailableProviders(): Promise<string[]> {
+  const available: string[] = [];
+
+  for (const [key, config] of Object.entries(EXTRACTION_PROVIDERS)) {
+    const cliBinary = CLI_PROVIDERS[key];
+    if (cliBinary) {
+      if (process.env[config.envKey] === 'true') {
+        try {
+          const { execSync } = await import('child_process');
+          execSync(`which ${cliBinary}`, { stdio: 'ignore' });
+          available.push(key);
+        } catch {
+          // CLI not found
+        }
+      }
+      continue;
+    }
+    if (process.env[config.envKey]) {
+      available.push(key);
+    }
+  }
+
+  return available;
+}
 
 export function getModelCosts(
   provider: string,

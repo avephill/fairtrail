@@ -50,6 +50,8 @@ export async function getInviteCookie(): Promise<string | undefined> {
 }
 
 export async function hasValidInvite(): Promise<boolean> {
+  if (process.env.SELF_HOSTED === 'true') return true;
+
   const session = await getSessionToken();
   if (session && verifySessionToken(session)) return true;
 

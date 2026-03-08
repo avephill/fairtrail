@@ -86,13 +86,16 @@ model FetchRun {
 }
 
 model ExtractionConfig {
-  id                String   @id @default("singleton")
-  provider          String   @default("anthropic")
-  model             String   @default("claude-haiku-4-5-20251001")
-  enabled           Boolean  @default(true)
-  scrapeInterval    Int      @default(6) // hours — global default
-  adminPasswordHash String?
-  updatedAt         DateTime @updatedAt
+  id                   String    @id @default("singleton")
+  provider             String    @default("anthropic")
+  model                String    @default("claude-haiku-4-5-20251001")
+  enabled              Boolean   @default(true)
+  scrapeInterval       Int       @default(6) // hours — global default
+  adminPasswordHash    String?
+  communitySharing     Boolean   @default(false)
+  communityApiKey      String?
+  lastCommunitySyncAt  DateTime?
+  updatedAt            DateTime  @updatedAt
 }
 
 model InviteCode {
@@ -121,4 +124,40 @@ model ApiUsageLog {
 
   @@index([createdAt])
   @@index([provider])
+}
+
+model CommunityApiKey {
+  id            String    @id @default(cuid())
+  apiKey        String    @unique
+  label         String?
+  active        Boolean   @default(true)
+  snapshotCount Int       @default(0)
+  lastSeenAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  snapshots CommunitySnapshot[]
+
+  @@index([active])
+}
+
+model CommunitySnapshot {
+  id          String   @id @default(cuid())
+  origin      String   // 3-letter IATA
+  destination String   // 3-letter IATA
+  travelDate  DateTime
+  price       Float
+  currency    String   @default("USD")
+  airline     String
+  stops       Int      @default(0)
+  cabinClass  String   @default("economy")
+  scrapedAt   DateTime
+  receivedAt  DateTime @default(now())
+  apiKeyId    String
+
+  apiKey CommunityApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([origin, destination])
+  @@index([travelDate])
+  @@index([airline])
+  @@index([apiKeyId])
 }
