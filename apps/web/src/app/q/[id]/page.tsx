@@ -7,6 +7,7 @@ import { PriceHistory } from '@/components/PriceHistory';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { DeleteTracker } from '@/components/DeleteTracker';
+import { ScrapeInterval } from '@/components/ScrapeInterval';
 import { Footer } from '@/components/Footer';
 import styles from './page.module.css';
 
@@ -58,6 +59,7 @@ interface QueryWithSnapshots {
     firstViewedAt: Date | null;
     groupId: string | null;
     currency: string;
+    scrapeInterval: number;
   };
   snapshots: Array<{
     id: string;
@@ -279,7 +281,12 @@ export default async function ChartPage({ params }: Props) {
             Tracked since {formatDate(primary.query.createdAt)}
             {allQueries[0]?.lastRun && ` · Last checked ${timeAgo(allQueries[0].lastRun.startedAt)}`}
           </p>
-          {!expired && <DeleteTracker queryId={id} />}
+          {!expired && (
+            <>
+              <ScrapeInterval queryId={id} currentInterval={primary.query.scrapeInterval} />
+              <DeleteTracker queryId={id} />
+            </>
+          )}
         </div>
       </div>
       <Footer />
