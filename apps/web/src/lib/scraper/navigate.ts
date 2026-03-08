@@ -66,8 +66,11 @@ export async function navigateGoogleFlights(
         // Selector not found — page may be blocked, CAPTCHA'd, or empty
       }
 
-      const html = await page.content();
-      console.log(`[navigate] attempt ${attempt}: resultsFound=${resultsFound}, htmlLength=${html.length}`);
+      // Capture visible text instead of raw HTML — Google Flights pages are 2-3MB
+      // of HTML but only ~3k of visible text, and flight data starts deep in the DOM
+      // where a 50k char cap would never reach it
+      const html = await page.evaluate(() => document.body.innerText);
+      console.log(`[navigate] attempt ${attempt}: resultsFound=${resultsFound}, textLength=${html.length}`);
 
       await context.close();
 
@@ -234,7 +237,7 @@ export async function navigateAirlineDirect(
       // No price content detected — page may be blocked or empty
     }
 
-    const html = await page.content();
+    const html = await page.evaluate(() => document.body.innerText);
 
     await context.close();
     return { html, url, resultsFound, source: 'airline_direct' };

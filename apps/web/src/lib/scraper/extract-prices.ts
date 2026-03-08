@@ -62,7 +62,7 @@ function buildSystemPrompt(filters: QueryFilters, maxResults: number, source: Na
     ? '- For bookingUrl, use the search URL provided (the airline website URL)'
     : "- If you can't find a direct booking URL, construct one from the Google Flights URL";
 
-  return `You are a flight price data extractor. Given HTML from ${sourceDesc}, extract the best matching flight options.
+  return `You are a flight price data extractor. Given the visible text content from ${sourceDesc}, extract the best matching flight options.
 
 Return ONLY valid JSON — an array of UP TO ${maxResults} objects with this exact shape:
 [
@@ -136,15 +136,13 @@ export async function extractPrices(
     throw new Error(`Missing API key: ${providerConfig.envKey}`);
   }
 
-  // Trim HTML to reduce token usage — keep only the main content area
-  const trimmedHtml = trimFlightHtml(html);
-  console.log(`[extract] sending ${trimmedHtml.length} chars to ${provider}/${model} (raw html: ${html.length})`);
+  console.log(`[extract] sending ${html.length} chars to ${provider}/${model}`);
 
   const userPrompt = `Search URL: ${searchUrl}
 Default travel date (if not visible per result): ${travelDateFallback}
 
-HTML content:
-${trimmedHtml}`;
+Page content:
+${html}`;
 
   const systemPrompt = buildSystemPrompt(filters, maxResults, source);
   const result = await providerConfig.extract(apiKey, model, systemPrompt, userPrompt);
@@ -174,22 +172,4 @@ ${trimmedHtml}`;
 
   console.log(`[extract] OK — ${prices.length} flights extracted (cheapest: $${prices[0]?.price})`);
   return { prices, usage: result.usage };
-}
-
-function trimFlightHtml(html: string): string {
-  // Remove script tags, style tags, and excessive whitespace
-  let trimmed = html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<svg[\s\S]*?<\/svg>/gi, '')
-    .replace(/<img[^>]*>/gi, '')
-    .replace(/\s{2,}/g, ' ')
-    .replace(/>\s+</g, '><');
-
-  // Cap at ~50k chars to stay within token limits
-  if (trimmed.length > 50_000) {
-    trimmed = trimmed.slice(0, 50_000);
-  }
-
-  return trimmed;
 }
