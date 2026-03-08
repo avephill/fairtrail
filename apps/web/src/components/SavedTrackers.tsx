@@ -2,13 +2,34 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getSavedTrackers, removeSavedTracker, type SavedTracker } from '@/lib/tracker-storage';
+import { getSavedTrackers, removeSavedTracker } from '@/lib/tracker-storage';
 import styles from './SavedTrackers.module.css';
 
-type TrackerStatus = 'active' | 'expired' | 'deleted';
+interface ActiveQuery {
+  id: string;
+  origin: string;
+  destination: string;
+  originName: string;
+  destinationName: string;
+  dateFrom: string;
+  dateTo: string;
+  scrapeInterval: number;
+  snapshotCount: number;
+  lastScrapedAt: string | null;
+  groupId: string | null;
+  createdAt: string;
+}
 
-interface TrackerWithStatus extends SavedTracker {
-  status: TrackerStatus;
+interface DisplayTracker {
+  id: string;
+  origin: string;
+  destination: string;
+  dateFrom: string;
+  dateTo: string;
+  snapshotCount: number;
+  lastScrapedAt: string | null;
+  status: 'active' | 'expired' | 'deleted';
+  hasDeleteToken: boolean;
 }
 
 function formatDate(iso: string): string {
@@ -18,34 +39,98 @@ function formatDate(iso: string): string {
   });
 }
 
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export function SavedTrackers() {
-  const [trackers, setTrackers] = useState<TrackerWithStatus[]>([]);
+  const [trackers, setTrackers] = useState<DisplayTracker[]>([]);
 
   useEffect(() => {
-    const saved = getSavedTrackers();
-    if (saved.length === 0) return;
+    const localTrackers = getSavedTrackers();
+    const deleteTokenMap = new Map(
+      localTrackers.filter((t) => t.deleteToken).map((t) => [t.id, t.deleteToken!])
+    );
 
-    // Fetch statuses
-    fetch('/api/queries/status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: saved.map((t) => t.id) }),
-    })
+    // Fetch all active queries from server
+    fetch('/api/queries/active')
       .then((res) => res.json())
       .then((data) => {
-        if (!data.ok) return;
-        const statusMap = data.data as Record<string, TrackerStatus>;
-        setTrackers(
-          saved.map((t) => ({
-            ...t,
-            status: statusMap[t.id] ?? 'deleted',
-          }))
-        );
+        if (!data.ok || !data.data?.queries) {
+          // Fallback to localStorage-only
+          fallbackToLocal(localTrackers);
+          return;
+        }
+
+        const serverQueries: ActiveQuery[] = data.data.queries;
+
+        if (serverQueries.length > 0) {
+          // Server has queries — use those (self-hosted or authed user)
+          const display: DisplayTracker[] = serverQueries.map((q) => ({
+            id: q.id,
+            origin: q.origin,
+            destination: q.destination,
+            dateFrom: q.dateFrom,
+            dateTo: q.dateTo,
+            snapshotCount: q.snapshotCount,
+            lastScrapedAt: q.lastScrapedAt,
+            status: 'active',
+            hasDeleteToken: deleteTokenMap.has(q.id),
+          }));
+          setTrackers(display);
+        } else {
+          // No server queries — fall back to localStorage
+          fallbackToLocal(localTrackers);
+        }
       })
       .catch(() => {
-        // Show without status on network error
-        setTrackers(saved.map((t) => ({ ...t, status: 'active' })));
+        fallbackToLocal(localTrackers);
       });
+
+    function fallbackToLocal(saved: typeof localTrackers) {
+      if (saved.length === 0) return;
+      fetch('/api/queries/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: saved.map((t) => t.id) }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.ok) return;
+          const statusMap = data.data as Record<string, 'active' | 'expired' | 'deleted'>;
+          setTrackers(
+            saved.map((t) => ({
+              id: t.id,
+              origin: t.origin,
+              destination: t.destination,
+              dateFrom: t.dateFrom,
+              dateTo: t.dateTo,
+              snapshotCount: 0,
+              lastScrapedAt: null,
+              status: statusMap[t.id] ?? 'deleted',
+              hasDeleteToken: Boolean(t.deleteToken),
+            }))
+          );
+        })
+        .catch(() => {
+          setTrackers(
+            saved.map((t) => ({
+              ...t,
+              snapshotCount: 0,
+              lastScrapedAt: null,
+              status: 'active' as const,
+              hasDeleteToken: Boolean(t.deleteToken),
+            }))
+          );
+        });
+    }
   }, []);
 
   const handleRemove = (id: string) => {
@@ -61,20 +146,22 @@ export function SavedTrackers() {
       <div className={styles.list}>
         {trackers.map((t) => (
           <div key={t.id} className={styles.card}>
-            <button
-              className={styles.remove}
-              onClick={() => handleRemove(t.id)}
-              title="Remove"
-              aria-label="Remove tracker"
-            >
-              &times;
-            </button>
+            {t.hasDeleteToken && (
+              <button
+                className={styles.remove}
+                onClick={() => handleRemove(t.id)}
+                title="Remove"
+                aria-label="Remove tracker"
+              >
+                &times;
+              </button>
+            )}
 
             {t.status === 'deleted' ? (
               <div className={styles.content}>
                 <div className={styles.route}>
                   <span className={styles.code}>{t.origin}</span>
-                  <span className={styles.arrow}>→</span>
+                  <span className={styles.arrow}>&rarr;</span>
                   <span className={styles.code}>{t.destination}</span>
                 </div>
                 <span className={`${styles.badge} ${styles.badgeDeleted}`}>Unavailable</span>
@@ -84,14 +171,26 @@ export function SavedTrackers() {
                 <div className={styles.content}>
                   <div className={styles.route}>
                     <span className={styles.code}>{t.origin}</span>
-                    <span className={styles.arrow}>→</span>
+                    <span className={styles.arrow}>&rarr;</span>
                     <span className={styles.code}>{t.destination}</span>
                   </div>
                   <span className={styles.dates}>
-                    {formatDate(t.dateFrom)} — {formatDate(t.dateTo)}
+                    {formatDate(t.dateFrom)} &mdash; {formatDate(t.dateTo)}
                   </span>
+                  <div className={styles.meta}>
+                    {t.snapshotCount > 0 && (
+                      <span className={styles.snapshots}>
+                        {t.snapshotCount} price{t.snapshotCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {t.lastScrapedAt && (
+                      <span className={styles.lastScrape}>
+                        {timeAgo(t.lastScrapedAt)}
+                      </span>
+                    )}
+                  </div>
                   <span className={`${styles.badge} ${t.status === 'active' ? styles.badgeActive : styles.badgeExpired}`}>
-                    {t.status === 'active' ? 'Active' : 'Expired'}
+                    {t.status === 'active' ? 'Tracking' : 'Expired'}
                   </span>
                 </div>
               </Link>

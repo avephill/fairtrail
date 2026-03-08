@@ -7,6 +7,8 @@ import { SetupRedirect } from '@/components/SetupRedirect';
 import { Footer } from '@/components/Footer';
 import { getSessionToken, verifySessionToken } from '@/lib/admin-auth';
 
+const isSelfHosted = process.env.SELF_HOSTED === 'true';
+
 export default async function HomePage() {
   const token = await getSessionToken();
   const isAdmin = token ? verifySessionToken(token) : false;
@@ -29,7 +31,7 @@ export default async function HomePage() {
 
   return (
     <main className={styles.root}>
-      <SetupRedirect />
+      {isSelfHosted && <SetupRedirect />}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -52,8 +54,22 @@ export default async function HomePage() {
         <p className={styles.tagline}>
           The price trail airlines don&apos;t show you
         </p>
-        <SearchBar />
-        <SavedTrackers />
+        {isSelfHosted ? (
+          <>
+            <SearchBar />
+            <SavedTrackers />
+          </>
+        ) : (
+          <div className={styles.install}>
+            <code className={styles.installCode}>
+              curl -fsSL https://fairtrail.org/install.sh | sh
+            </code>
+            <p className={styles.installHint}>
+              Works with Claude Code, Codex, or any LLM API key.
+              No account needed.
+            </p>
+          </div>
+        )}
       </div>
 
       <section className={styles.why}>
@@ -92,6 +108,44 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {!isSelfHosted && (
+        <section className={styles.how}>
+          <h2 className={styles.whyTitle}>How it works</h2>
+          <div className={styles.steps}>
+            <div className={styles.step}>
+              <span className={styles.stepNumber}>1</span>
+              <div>
+                <h3 className={styles.reasonTitle}>Install in one command</h3>
+                <p className={styles.reasonText}>
+                  The setup script auto-detects Claude Code or Codex on your machine.
+                  If you have either, no API key needed &mdash; it uses your existing subscription.
+                </p>
+              </div>
+            </div>
+            <div className={styles.step}>
+              <span className={styles.stepNumber}>2</span>
+              <div>
+                <h3 className={styles.reasonTitle}>Search in plain English</h3>
+                <p className={styles.reasonText}>
+                  Type &ldquo;NYC to Tokyo next month under $800&rdquo; and Fairtrail
+                  starts tracking prices across airlines every 3 hours.
+                </p>
+              </div>
+            </div>
+            <div className={styles.step}>
+              <span className={styles.stepNumber}>3</span>
+              <div>
+                <h3 className={styles.reasonTitle}>See the real trend</h3>
+                <p className={styles.reasonText}>
+                  Get a shareable chart showing price evolution over time.
+                  Click any data point to book directly with the airline.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <Footer />
     </main>
