@@ -107,6 +107,7 @@ model ApiUsageLog {
   costUsd      Float
   operation    String
   durationMs   Int
+  error        String?
   createdAt    DateTime @default(now())
 
   @@index([createdAt])

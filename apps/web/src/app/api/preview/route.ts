@@ -90,6 +90,10 @@ export async function POST(request: NextRequest) {
         (usage.inputTokens / 1000) * costs.costPer1kInput +
         (usage.outputTokens / 1000) * costs.costPer1kOutput;
 
+      const errorDetail = failureReason
+        ? `[${failureReason}] ${origin} → ${destination} ${dateFrom} to ${dateTo}`
+        : null;
+
       await prisma.apiUsageLog.create({
         data: {
           provider,
@@ -99,17 +103,18 @@ export async function POST(request: NextRequest) {
           costUsd: cost,
           operation: 'preview-flights',
           durationMs: 0,
+          error: errorDetail,
         },
       });
 
       if (failureReason) {
         const messages: Record<string, string> = {
-          page_not_loaded: 'Google Flights did not load flight results — the page may have been blocked or served a CAPTCHA. Please try again in a few minutes.',
-          no_json_in_response: 'We scraped the page but could not extract any flight data. Google Flights may have changed its layout or returned an error page. Please try again.',
-          empty_extraction: 'The page loaded but contained no flight results. Google may be rate-limiting our requests. Please try again in a few minutes.',
-          all_filtered_out: `Flights were found for ${origin} → ${destination}, but none matched your filters. Try relaxing price, stops, or airline preferences.`,
+          page_not_loaded: `[${failureReason}] Google Flights did not load results — the page was blocked or served a CAPTCHA. Try again in a few minutes.`,
+          no_json_in_response: `[${failureReason}] Scraped the page but could not extract flight data — Google may have returned an error page. Try again.`,
+          empty_extraction: `[${failureReason}] Page loaded but no flights were found in the HTML — Google may be rate-limiting. Try again in a few minutes.`,
+          all_filtered_out: `[${failureReason}] Flights exist for ${origin} → ${destination}, but none matched your filters. Try relaxing price, stops, or airline preferences.`,
         };
-        throw new Error(messages[failureReason] ?? 'Flight extraction failed unexpectedly. Please try again.');
+        throw new Error(messages[failureReason] ?? `[${failureReason}] Flight extraction failed. Try again.`);
       }
 
       return extracted;

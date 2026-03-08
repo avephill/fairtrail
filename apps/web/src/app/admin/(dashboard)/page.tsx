@@ -4,7 +4,7 @@ import styles from './page.module.css';
 export const dynamic = 'force-dynamic';
 
 export default async function AdminDashboard() {
-  const [activeQueries, totalRuns, recentRuns, costData] = await Promise.all([
+  const [activeQueries, totalRuns, recentRuns, costData, recentErrors] = await Promise.all([
     prisma.query.count({ where: { active: true, expiresAt: { gt: new Date() } } }),
     prisma.fetchRun.count(),
     prisma.fetchRun.findMany({
@@ -15,6 +15,11 @@ export default async function AdminDashboard() {
     prisma.apiUsageLog.aggregate({
       _sum: { costUsd: true },
       where: { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+    }),
+    prisma.apiUsageLog.findMany({
+      where: { error: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
     }),
   ]);
 
@@ -38,6 +43,39 @@ export default async function AdminDashboard() {
           <span className={styles.statLabel}>LLM Cost (30d)</span>
         </div>
       </div>
+
+      {recentErrors.length > 0 && (
+        <>
+          <h2 className={styles.sectionTitle}>Recent Errors</h2>
+          <div className={styles.tableWrapper}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Operation</th>
+                  <th>Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentErrors.map((log) => (
+                  <tr key={log.id}>
+                    <td className={styles.mono}>
+                      {log.createdAt.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                    <td>{log.operation}</td>
+                    <td><span className={styles.statusFail}>{log.error}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       <h2 className={styles.sectionTitle}>Recent Runs</h2>
       {recentRuns.length === 0 ? (
