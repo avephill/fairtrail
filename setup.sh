@@ -27,14 +27,14 @@ echo ""
 # 1. Check Docker
 # ---------------------------------------------------------------------------
 if ! command -v docker &>/dev/null; then
-  fail "Docker is required. Install from https://docs.docker.com/get-docker/"
+  fail "Docker Desktop is required. Install from https://docs.docker.com/get-docker/"
 fi
 
 if ! docker info &>/dev/null 2>&1; then
-  fail "Docker daemon is not running. Start Docker and try again."
+  fail "Docker Desktop is not running. Start it and try again."
 fi
 
-ok "Docker detected"
+ok "Ready"
 
 # ---------------------------------------------------------------------------
 # 2. Detect LLM providers (Claude Code CLI → Codex CLI → API key prompt)
@@ -174,9 +174,29 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Start services
+# 5. Install the `fairtrail` command
 # ---------------------------------------------------------------------------
-info "Starting Fairtrail (first run pulls images + builds — this takes a minute)..."
+INSTALL_BIN="$HOME/.local/bin"
+mkdir -p "$INSTALL_BIN"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ln -sf "$SCRIPT_DIR/bin/fairtrail" "$INSTALL_BIN/fairtrail"
+
+# Check if ~/.local/bin is in PATH
+if ! echo "$PATH" | tr ':' '\n' | grep -qx "$INSTALL_BIN"; then
+  warn "$INSTALL_BIN is not in your PATH"
+  echo ""
+  echo -e "  Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.):"
+  echo -e "  ${BOLD}export PATH=\"\$HOME/.local/bin:\$PATH\"${RESET}"
+  echo ""
+fi
+
+ok "Installed 'fairtrail' command to $INSTALL_BIN/fairtrail"
+
+# ---------------------------------------------------------------------------
+# 6. Start services
+# ---------------------------------------------------------------------------
+info "Starting Fairtrail (first run takes a minute)..."
 echo ""
 
 docker compose up -d --build 2>&1 | while IFS= read -r line; do
@@ -186,7 +206,7 @@ done
 echo ""
 
 # ---------------------------------------------------------------------------
-# 6. Wait for the app to be ready
+# 7. Wait for the app to be ready
 # ---------------------------------------------------------------------------
 info "Waiting for the app to start..."
 
@@ -195,7 +215,7 @@ RETRIES=60
 until curl -sf "http://localhost:${PORT}/api/health" >/dev/null 2>&1; do
   RETRIES=$((RETRIES - 1))
   if [ "$RETRIES" -le 0 ]; then
-    warn "App didn't respond in 60s — check 'docker compose logs web'"
+    warn "App didn't respond in 60s — run 'fairtrail logs' to debug"
     break
   fi
   sleep 1
@@ -206,7 +226,7 @@ if [ "$RETRIES" -gt 0 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Print summary
+# 8. Print summary
 # ---------------------------------------------------------------------------
 echo ""
 echo -e "${BOLD}  ┌──────────────────────────────────────────────────┐${RESET}"
@@ -227,5 +247,7 @@ echo -e "${BOLD}  │${RESET}                                                  $
 echo -e "${BOLD}  └──────────────────────────────────────────────────┘${RESET}"
 echo ""
 echo -e "  ${DIM}Complete setup at http://localhost:${PORT}/setup${RESET}"
-echo -e "  ${DIM}View logs: docker compose logs -f web${RESET}"
+echo ""
+echo -e "  Next time, just run: ${BOLD}fairtrail${RESET}"
+echo -e "  ${DIM}Ctrl+C to stop  |  fairtrail stop  |  fairtrail help${RESET}"
 echo ""

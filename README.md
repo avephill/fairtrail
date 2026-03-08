@@ -67,10 +67,10 @@ Fairtrail exists because the data is useful to *you* — just not to the compani
 
 ## Requirements
 
-- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Desktop](https://docs.docker.com/get-docker/) (runs everything behind the scenes — you won't interact with it directly)
 - One of:
-  - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (free with Claude Pro/Max) — auto-detected
-  - [Codex CLI](https://github.com/openai/codex) (free with ChatGPT Pro) — auto-detected
+  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (free with Claude Pro/Max) — auto-detected
+  - [Codex](https://github.com/openai/codex) (free with ChatGPT Pro) — auto-detected
   - An API key from Anthropic, OpenAI, or Google
 
 ## LLM Providers
@@ -85,7 +85,7 @@ Fairtrail needs an LLM for two things: parsing natural language queries and extr
 | **OpenAI** | `OPENAI_API_KEY` | ~$0.0004/query | GPT-4.1 Mini |
 | **Google** | `GOOGLE_AI_API_KEY` | ~$0.00015/query | Gemini 2.5 Flash (cheapest) |
 
-CLI providers are listed first because they cost nothing extra if you already have a subscription. The setup script handles all the Docker volume mounts automatically.
+CLI providers are listed first because they cost nothing extra if you already have a subscription. The setup script handles everything automatically.
 
 ## Configuration
 
@@ -201,20 +201,12 @@ The built-in cron runs on a configurable interval (default: every 3h). Each run 
 ## Managing Fairtrail
 
 ```bash
-cd ~/fairtrail   # or wherever you cloned it
-
-docker compose up -d       # start (runs in background)
-docker compose stop        # stop (keeps data)
-docker compose logs -f web # view logs
-docker compose down        # stop and remove containers (data persists in volumes)
-```
-
-### Updating
-
-```bash
-cd ~/fairtrail
-git pull
-docker compose up -d --build
+fairtrail            # start (Ctrl+C to stop)
+fairtrail start      # start in background
+fairtrail stop       # stop
+fairtrail logs       # view live logs
+fairtrail status     # check if running
+fairtrail update     # pull latest version and restart
 ```
 
 ## Development

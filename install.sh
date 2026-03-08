@@ -21,7 +21,7 @@ echo ""
 
 # Check prerequisites
 command -v git  &>/dev/null || fail "git is required"
-command -v docker &>/dev/null || fail "Docker is required. Install from https://docs.docker.com/get-docker/"
+command -v docker &>/dev/null || fail "Docker Desktop is required. Install from https://docs.docker.com/get-docker/"
 
 # Choose install directory
 INSTALL_DIR="${FAIRTRAIL_DIR:-$HOME/fairtrail}"
