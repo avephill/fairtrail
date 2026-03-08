@@ -48,10 +48,8 @@ Return ONLY valid JSON with this exact shape:
     { "field": "date" | "origin" | "destination" | "general", "question": "clarifying question", "options": ["option1", "option2"] }
   ],
   "parsed": {
-    "origin": "IATA airport code (3 letters, e.g. JFK)",
-    "originName": "City name (e.g. New York)",
-    "destination": "IATA airport code (3 letters, e.g. CDG)",
-    "destinationName": "City name (e.g. Paris)",
+    "origins": [{ "code": "JFK", "name": "New York JFK" }, { "code": "EWR", "name": "Newark" }],
+    "destinations": [{ "code": "ORD", "name": "Chicago O'Hare" }, { "code": "MDW", "name": "Chicago Midway" }],
     "dateFrom": "YYYY-MM-DD start of travel window",
     "dateTo": "YYYY-MM-DD end of travel window",
     "flexibility": number of days of flexibility (0 if exact dates),
@@ -65,10 +63,23 @@ Return ONLY valid JSON with this exact shape:
 }
 
 CRITICAL — "parsed" must ALWAYS be filled:
-- If origin and destination are clearly stated (e.g. "from Dusseldorf to Chicago"), ALWAYS fill origin, originName, destination, destinationName — even if dates are ambiguous or confidence is "low"
+- If origin and destination are clearly stated (e.g. "from Dusseldorf to Chicago"), ALWAYS fill origins and destinations arrays — even if dates are ambiguous or confidence is "low"
 - Only set "parsed" to null if the input is truly unparseable (gibberish, no flight intent)
 - Only ask about fields that are actually unclear. NEVER ask "Where are you flying from?" if the user already said it
 - When multiple dates are mentioned (e.g. "Friday or Saturday"), use your best guess for dateFrom/dateTo and ask ONLY about the date — do not re-ask origin/destination
+
+Multi-airport rules:
+- "origins" and "destinations" are arrays of { "code": "IATA", "name": "City/Airport Name" }
+- For cities with ONE major airport (e.g. Dusseldorf, Paris), return a single-element array: [{ "code": "DUS", "name": "Dusseldorf" }]
+- For cities with MULTIPLE major airports, list ALL relevant airports:
+  - "New York" → [{ "code": "JFK", "name": "New York JFK" }, { "code": "EWR", "name": "Newark" }, { "code": "LGA", "name": "LaGuardia" }]
+  - "Chicago" → [{ "code": "ORD", "name": "Chicago O'Hare" }, { "code": "MDW", "name": "Chicago Midway" }]
+  - "London" → [{ "code": "LHR", "name": "London Heathrow" }, { "code": "LGW", "name": "London Gatwick" }, { "code": "STN", "name": "London Stansted" }]
+  - "Tokyo" → [{ "code": "NRT", "name": "Tokyo Narita" }, { "code": "HND", "name": "Tokyo Haneda" }]
+  - "Washington DC" → [{ "code": "IAD", "name": "Washington Dulles" }, { "code": "DCA", "name": "Washington Reagan" }]
+  - "San Francisco Bay Area" → [{ "code": "SFO", "name": "San Francisco" }, { "code": "OAK", "name": "Oakland" }, { "code": "SJC", "name": "San Jose" }]
+- If the user specifies a SPECIFIC airport (e.g. "from JFK"), return only that one airport in the array
+- Put the most common/major airport first in the array (it becomes the default)
 
 Confidence rules:
 - "high": clear origin, destination, and specific date(s) within 14 days span
@@ -87,7 +98,7 @@ When confidence is "high":
 - Set "ambiguities" to an empty array []
 
 Parsing rules:
-- Use the most common airport for a city (NYC→JFK, London→LHR, Paris→CDG, Tokyo→NRT, Dusseldorf→DUS, Chicago→ORD)
+- List all major airports for multi-airport cities (see multi-airport rules above)
 - If the user says "around June 15 ± 3 days", set dateFrom to June 12, dateTo to June 18, flexibility to 3
 - If the user says "June 15-20", set dateFrom to June 15, dateTo to June 20, flexibility to 0
 - If the user says "next Friday or next Saturday", set dateFrom to the earlier date, dateTo to the later date, flexibility to 0, and confidence to "high" (both dates are covered by the window)
@@ -103,6 +114,37 @@ Parsing rules:
 - Today's date is ${today}
 - If this is a follow-up response to a previous question, incorporate the user's answer to refine the query
 - Return ONLY the JSON object, no markdown, no explanation`;
+}
+
+/** Normalize LLM response to always have origins/destinations arrays + derived single fields */
+function normalizeAirports(parsed: Record<string, unknown>): ParsedFlightQuery {
+  const p = parsed as Record<string, unknown>;
+
+  // If LLM returned new format (origins/destinations arrays)
+  let origins: Airport[] = Array.isArray(p.origins)
+    ? (p.origins as Airport[]).filter((a) => a.code && a.name)
+    : [];
+  let destinations: Airport[] = Array.isArray(p.destinations)
+    ? (p.destinations as Airport[]).filter((a) => a.code && a.name)
+    : [];
+
+  // Fall back to legacy single origin/destination fields
+  if (origins.length === 0 && typeof p.origin === 'string' && p.origin) {
+    origins = [{ code: p.origin as string, name: (p.originName as string) || p.origin as string }];
+  }
+  if (destinations.length === 0 && typeof p.destination === 'string' && p.destination) {
+    destinations = [{ code: p.destination as string, name: (p.destinationName as string) || p.destination as string }];
+  }
+
+  return {
+    ...(p as unknown as ParsedFlightQuery),
+    origins,
+    destinations,
+    origin: origins[0]?.code ?? '',
+    originName: origins[0]?.name ?? '',
+    destination: destinations[0]?.code ?? '',
+    destinationName: destinations[0]?.name ?? '',
+  };
 }
 
 export async function parseFlightQuery(
@@ -155,19 +197,20 @@ export async function parseFlightQuery(
 
   if ('confidence' in raw && 'parsed' in raw) {
     // New envelope format
-    parsed = raw.parsed as ParsedFlightQuery | null;
+    const rawParsed = raw.parsed as Record<string, unknown> | null;
+    parsed = rawParsed ? normalizeAirports(rawParsed) : null;
     confidence = (raw.confidence as string) === 'high' ? 'high'
       : (raw.confidence as string) === 'medium' ? 'medium' : 'low';
     ambiguities = Array.isArray(raw.ambiguities) ? raw.ambiguities as ParseAmbiguity[] : [];
   } else {
     // Legacy flat format — treat as high confidence
-    parsed = raw as unknown as ParsedFlightQuery;
+    parsed = normalizeAirports(raw);
     confidence = 'high';
     ambiguities = [];
   }
 
   // Validate required fields on parsed
-  if (parsed && (!parsed.origin || !parsed.destination || !parsed.dateFrom || !parsed.dateTo)) {
+  if (parsed && (!parsed.origins.length || !parsed.destinations.length || !parsed.dateFrom || !parsed.dateTo)) {
     parsed = null;
     confidence = 'low';
     if (ambiguities.length === 0) {
