@@ -21,7 +21,9 @@ export async function POST(request: Request) {
     communitySharing?: boolean;
   };
 
-  if (!adminPassword || adminPassword.length < 8) {
+  const isSelfHosted = process.env.SELF_HOSTED === 'true';
+
+  if (!isSelfHosted && (!adminPassword || adminPassword.length < 8)) {
     return apiError('Password must be at least 8 characters', 400);
   }
 
@@ -29,7 +31,9 @@ export async function POST(request: Request) {
     return apiError('Provider and model are required', 400);
   }
 
-  const passwordHash = createHash('sha256').update(adminPassword).digest('hex');
+  const passwordHash = isSelfHosted
+    ? 'self-hosted'
+    : createHash('sha256').update(adminPassword).digest('hex');
 
   // Register for community API key if opted in
   let communityApiKey: string | null = null;

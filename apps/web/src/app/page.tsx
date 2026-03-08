@@ -170,6 +170,66 @@ export default async function HomePage() {
         </section>
       )}
 
+      {!isSelfHosted && (
+        <section className={styles.selfHost}>
+          <h2 className={styles.whyTitle}>Why self-hosted?</h2>
+          <p className={styles.selfHostLead}>
+            Decentralization isn&apos;t a philosophy &mdash; it&apos;s the only design that works.
+          </p>
+          <div className={styles.benefits}>
+            <div className={styles.benefit}>
+              <span className={styles.benefitIcon} aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm3.354 5.354-4 4a.5.5 0 0 1-.708 0l-2-2a.5.5 0 1 1 .708-.708L7 9.293l3.646-3.647a.5.5 0 0 1 .708.708Z" fill="currentColor"/></svg>
+              </span>
+              <div>
+                <h3 className={styles.reasonTitle}>It can&apos;t work any other way</h3>
+                <p className={styles.reasonText}>
+                  A centralized service scraping Google Flights gets IP-banned within days.
+                  Thousands of self-hosted instances, each making a few quiet requests from
+                  different IPs, is the only architecture that survives.
+                </p>
+              </div>
+            </div>
+            <div className={styles.benefit}>
+              <span className={styles.benefitIcon} aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm3.354 5.354-4 4a.5.5 0 0 1-.708 0l-2-2a.5.5 0 1 1 .708-.708L7 9.293l3.646-3.647a.5.5 0 0 1 .708.708Z" fill="currentColor"/></svg>
+              </span>
+              <div>
+                <h3 className={styles.reasonTitle}>Your searches stay private</h3>
+                <p className={styles.reasonText}>
+                  No one sees what routes you&apos;re watching or when you&apos;re planning to travel.
+                  Airlines can&apos;t use your search history against you.
+                </p>
+              </div>
+            </div>
+            <div className={styles.benefit}>
+              <span className={styles.benefitIcon} aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm3.354 5.354-4 4a.5.5 0 0 1-.708 0l-2-2a.5.5 0 1 1 .708-.708L7 9.293l3.646-3.647a.5.5 0 0 1 .708.708Z" fill="currentColor"/></svg>
+              </span>
+              <div>
+                <h3 className={styles.reasonTitle}>Free if you have Claude Code or Codex</h3>
+                <p className={styles.reasonText}>
+                  The setup script detects your existing CLI and uses it &mdash; zero API cost.
+                  Otherwise, extraction costs under $0.001 per query.
+                </p>
+              </div>
+            </div>
+            <div className={styles.benefit}>
+              <span className={styles.benefitIcon} aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm3.354 5.354-4 4a.5.5 0 0 1-.708 0l-2-2a.5.5 0 1 1 .708-.708L7 9.293l3.646-3.647a.5.5 0 0 1 .708.708Z" fill="currentColor"/></svg>
+              </span>
+              <div>
+                <h3 className={styles.reasonTitle}>You control the scrape frequency</h3>
+                <p className={styles.reasonText}>
+                  Default is every 3 hours. Want every hour? Change one setting.
+                  Your data, your database &mdash; export it, analyze it, keep it forever.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       <Footer />
     </main>
   );

@@ -204,6 +204,43 @@
   border-radius: 50%;
 }
 
+/* Why self-hosted (fairtrail.org) */
+.selfHost {
+  width: 100%;
+  max-width: 720px;
+  padding: 3rem 1.5rem 4rem;
+  border-top: 1px solid var(--border);
+}
+
+.selfHostLead {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.benefit {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.benefitIcon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
 @media (max-width: 640px) {
   .hero {
     padding-top: 8vh;

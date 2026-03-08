@@ -6,6 +6,7 @@ import { EXTRACTION_PROVIDERS } from '@/lib/scraper/ai-registry';
 
 interface SetupStatus {
   setupComplete: boolean;
+  isSelfHosted: boolean;
   detectedProviders: string[];
   currentProvider: string | null;
   currentModel: string | null;
@@ -31,6 +32,9 @@ export default function SetupPage() {
           return;
         }
         setStatus(data);
+        if (data.isSelfHosted) {
+          setStep(1);
+        }
         if (data.detectedProviders.length > 0) {
           const defaultProvider = data.detectedProviders[0]!;
           setProvider(defaultProvider);
@@ -98,6 +102,7 @@ export default function SetupPage() {
   const hasCliProvider = status.detectedProviders.some((p) => CLI_PROVIDERS.has(p));
 
   const providerEntries = Object.entries(EXTRACTION_PROVIDERS);
+  const isSelfHosted = status.isSelfHosted;
   const subtitles = [
     'Set your admin password',
     'Choose your LLM provider',
@@ -111,11 +116,15 @@ export default function SetupPage() {
         <p className={styles.subtitle}>{subtitles[step]}</p>
 
         <div className={styles.steps}>
-          <span className={`${styles.step} ${step >= 0 ? styles.active : ''}`}>1. Password</span>
+          {!isSelfHosted && (
+            <>
+              <span className={`${styles.step} ${step >= 0 ? styles.active : ''}`}>1. Password</span>
+              <span className={styles.stepDivider}>/</span>
+            </>
+          )}
+          <span className={`${styles.step} ${step >= 1 ? styles.active : ''}`}>{isSelfHosted ? '1' : '2'}. Provider</span>
           <span className={styles.stepDivider}>/</span>
-          <span className={`${styles.step} ${step >= 1 ? styles.active : ''}`}>2. Provider</span>
-          <span className={styles.stepDivider}>/</span>
-          <span className={`${styles.step} ${step >= 2 ? styles.active : ''}`}>3. Community</span>
+          <span className={`${styles.step} ${step >= 2 ? styles.active : ''}`}>{isSelfHosted ? '2' : '3'}. Community</span>
         </div>
 
         {step === 0 && (
@@ -215,7 +224,7 @@ export default function SetupPage() {
         {error && <p className={styles.error}>{error}</p>}
 
         <div className={styles.actions}>
-          {step > 0 && (
+          {step > (isSelfHosted ? 1 : 0) && (
             <button
               className={styles.backButton}
               onClick={() => setStep(step - 1)}

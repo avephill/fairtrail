@@ -6,11 +6,15 @@ export async function GET() {
     where: { id: 'singleton' },
   });
 
-  const setupComplete = Boolean(config?.adminPasswordHash);
+  const isSelfHosted = process.env.SELF_HOSTED === 'true';
+  const setupComplete = isSelfHosted
+    ? Boolean(config?.provider)
+    : Boolean(config?.adminPasswordHash);
   const detectedProviders = await detectAvailableProviders();
 
   return Response.json({
     setupComplete,
+    isSelfHosted,
     detectedProviders,
     currentProvider: config?.provider ?? null,
     currentModel: config?.model ?? null,
