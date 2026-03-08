@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { classifyBot, classifyByHeaders, isMaliciousPath } from '@/lib/analytics/bots';
 
 const SESSION_COOKIE = 'ft-session';
+const isSelfHosted = process.env.SELF_HOSTED === 'true';
 
 async function verifyHmacToken(token: string): Promise<boolean> {
   const secret = process.env.ADMIN_SESSION_SECRET;
@@ -51,27 +52,30 @@ export async function middleware(request: NextRequest) {
     return new NextResponse(null, { status: 404, headers: { 'X-Robots-Tag': 'noindex' } });
   }
 
-  // Admin pages (not login) — require session
-  if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
-    const token = request.cookies.get(SESSION_COOKIE)?.value;
-    if (!token || !(await verifyHmacToken(token))) {
-      return NextResponse.redirect(new URL('/admin/login', request.url));
+  // Admin auth — skip entirely for self-hosted (no admin panel)
+  if (!isSelfHosted) {
+    // Admin pages (not login) — require session
+    if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
+      const token = request.cookies.get(SESSION_COOKIE)?.value;
+      if (!token || !(await verifyHmacToken(token))) {
+        return NextResponse.redirect(new URL('/admin/login', request.url));
+      }
+    }
+
+    // Admin API routes — require session
+    if (pathname.startsWith('/api/admin') && !pathname.startsWith('/api/admin/auth')) {
+      const token = request.cookies.get(SESSION_COOKIE)?.value;
+      if (!token || !(await verifyHmacToken(token))) {
+        return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+      }
     }
   }
 
-  // Admin API routes — require session
-  if (pathname.startsWith('/api/admin') && !pathname.startsWith('/api/admin/auth')) {
-    const token = request.cookies.get(SESSION_COOKIE)?.value;
-    if (!token || !(await verifyHmacToken(token))) {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
-    }
-  }
-
-  // --- Analytics tracking ---
+  // --- Analytics tracking (fairtrail.org only) ---
   const userAgent = request.headers.get('user-agent') || '';
 
-  // Skip tracking for admin pages, API routes, empty UAs
-  if (!pathname.startsWith('/admin') && !pathname.startsWith('/api/') && userAgent) {
+  // Skip tracking for self-hosted, admin pages, API routes, empty UAs
+  if (!isSelfHosted && !pathname.startsWith('/admin') && !pathname.startsWith('/api/') && userAgent) {
     const forwardedFor = request.headers.get('x-forwarded-for');
     const ip = forwardedFor?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || '127.0.0.1';
 
