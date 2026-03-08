@@ -64,6 +64,7 @@ model FetchRun {
   id             String    @id @default(cuid())
   queryId        String
   status         String // 'success' | 'partial' | 'failed'
+  source         String    @default("google_flights") // 'google_flights' | 'airline_direct'
   snapshotsCount Int       @default(0)
   extractionCost Float?
   error          String?

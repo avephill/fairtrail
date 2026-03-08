@@ -2,9 +2,10 @@ import { NextRequest } from 'next/server';
 import { apiSuccess, apiError } from '@/lib/api-response';
 import { cached } from '@/lib/redis';
 import { prisma } from '@/lib/prisma';
-import { navigateGoogleFlights } from '@/lib/scraper/navigate';
+import { navigateGoogleFlights, navigateAirlineDirect } from '@/lib/scraper/navigate';
 import { extractPrices, type PriceData } from '@/lib/scraper/extract-prices';
 import { getModelCosts } from '@/lib/scraper/ai-registry';
+import { isKnownAirline } from '@/lib/scraper/airline-urls';
 import { createHash } from 'crypto';
 import { hasValidInvite } from '@/lib/invite-auth';
 
@@ -56,18 +57,34 @@ export async function POST(request: NextRequest) {
 
   try {
     const prices = await cached<PriceData[]>(cacheKey, async () => {
-      const { html, url, resultsFound } = await navigateGoogleFlights({
+      const searchParams = {
         origin,
         destination,
         dateFrom: from,
         dateTo: to,
-      });
+        cabinClass: cabinClass || 'economy',
+      };
+
+      const airlines: string[] = Array.isArray(preferredAirlines) ? preferredAirlines : [];
+      const directAirline = airlines.length === 1 && isKnownAirline(airlines[0]!) ? airlines[0]! : null;
+
+      let nav;
+      try {
+        nav = directAirline
+          ? await navigateAirlineDirect(searchParams, directAirline)
+          : await navigateGoogleFlights(searchParams);
+      } catch {
+        // Fall back to Google Flights if airline-direct fails
+        nav = await navigateGoogleFlights(searchParams);
+      }
+
+      const { html, url, resultsFound, source } = nav;
 
       const travelDateFallback = dateFrom;
       const filters = {
         maxPrice: maxPrice ? Number(maxPrice) : null,
         maxStops: maxStops !== undefined && maxStops !== null ? Number(maxStops) : null,
-        preferredAirlines: Array.isArray(preferredAirlines) ? preferredAirlines : [],
+        preferredAirlines: airlines,
         timePreference: timePreference || 'any',
         cabinClass: cabinClass || 'economy',
       };
@@ -78,7 +95,8 @@ export async function POST(request: NextRequest) {
         travelDateFallback,
         filters,
         PREVIEW_MAX_RESULTS,
-        resultsFound
+        resultsFound,
+        source
       );
 
       // Log API usage
@@ -103,10 +121,11 @@ export async function POST(request: NextRequest) {
       });
 
       if (failureReason) {
+        const sourceName = source === 'airline_direct' ? 'The airline website' : 'Google Flights';
         const messages: Record<string, string> = {
-          page_not_loaded: 'Google Flights did not load flight results — the page may have been blocked or served a CAPTCHA. Please try again in a few minutes.',
-          no_json_in_response: 'We scraped the page but could not extract any flight data. Google Flights may have changed its layout or returned an error page. Please try again.',
-          empty_extraction: 'The page loaded but contained no flight results. Google may be rate-limiting our requests. Please try again in a few minutes.',
+          page_not_loaded: `${sourceName} did not load flight results — the page may have been blocked or served a CAPTCHA. Please try again in a few minutes.`,
+          no_json_in_response: `We scraped the page but could not extract any flight data. ${sourceName} may have changed its layout or returned an error page. Please try again.`,
+          empty_extraction: `The page loaded but contained no flight results. ${sourceName} may be rate-limiting our requests. Please try again in a few minutes.`,
           all_filtered_out: `Flights were found for ${origin} → ${destination}, but none matched your filters. Try relaxing price, stops, or airline preferences.`,
         };
         throw new Error(messages[failureReason] ?? 'Flight extraction failed unexpectedly. Please try again.');

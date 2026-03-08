@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma';
-import { navigateGoogleFlights } from './navigate';
+import { navigateGoogleFlights, navigateAirlineDirect, type NavigationResult } from './navigate';
 import { extractPrices } from './extract-prices';
 import { getModelCosts } from './ai-registry';
+import { isKnownAirline } from './airline-urls';
 
 interface ScrapeResult {
   queryId: string;
@@ -29,14 +30,31 @@ export async function runScrapeForQuery(queryId: string): Promise<ScrapeResult> 
           destination: query.destination,
           dateFrom: new Date(),
           dateTo: new Date(Date.now() + query.lookAheadDays * 24 * 60 * 60 * 1000),
+          cabinClass: query.cabinClass,
         }
-      : query;
+      : { ...query, cabinClass: query.cabinClass };
 
-    // Navigate to Google Flights
-    const { html, url, resultsFound } = await navigateGoogleFlights(searchParams);
+    // Route: airline-direct for single known airline, Google Flights otherwise
+    const directAirlines = query.preferredAirlines.filter(isKnownAirline);
+    const useAirlineDirect = directAirlines.length > 0;
+
+    let navResults: NavigationResult[];
+    if (useAirlineDirect) {
+      // Scrape each known airline's site; fall back to Google Flights on failure
+      navResults = await Promise.all(
+        directAirlines.map(async (airline) => {
+          try {
+            return await navigateAirlineDirect(searchParams, airline);
+          } catch {
+            return navigateGoogleFlights(searchParams);
+          }
+        })
+      );
+    } else {
+      navResults = [await navigateGoogleFlights(searchParams)];
+    }
+
     const travelDateFallback = searchParams.dateFrom.toISOString().split('T')[0]!;
-
-    // Extract prices via LLM with user's filters
     const filters = {
       maxPrice: query.maxPrice,
       maxStops: query.maxStops,
@@ -44,24 +62,53 @@ export async function runScrapeForQuery(queryId: string): Promise<ScrapeResult> 
       timePreference: query.timePreference,
       cabinClass: query.cabinClass,
     };
-    const { prices, usage, failureReason } = await extractPrices(html, url, travelDateFallback, filters, undefined, resultsFound);
 
-    // Calculate cost
+    // Extract prices from each navigation result and merge
     const config = await prisma.extractionConfig.findFirst({ where: { id: 'singleton' } });
     const provider = config?.provider ?? 'anthropic';
     const model = config?.model ?? 'claude-haiku-4-5-20251001';
     const costs = getModelCosts(provider, model);
+
+    let allPrices: import('./extract-prices').PriceData[] = [];
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let lastFailureReason: string | undefined;
+    const sources = new Set<string>();
+
+    for (const nav of navResults) {
+      sources.add(nav.source);
+      const { prices, usage, failureReason } = await extractPrices(
+        nav.html, nav.url, travelDateFallback, filters, undefined, nav.resultsFound, nav.source
+      );
+      allPrices = allPrices.concat(prices);
+      totalInputTokens += usage.inputTokens;
+      totalOutputTokens += usage.outputTokens;
+      if (failureReason) lastFailureReason = failureReason;
+    }
+
+    // Deduplicate by airline + price + date
+    const seen = new Set<string>();
+    allPrices = allPrices.filter((p) => {
+      const key = `${p.airline}:${p.price}:${p.travelDate}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Sort by price
+    allPrices.sort((a, b) => a.price - b.price);
+
     const extractionCost =
-      (usage.inputTokens / 1000) * costs.costPer1kInput +
-      (usage.outputTokens / 1000) * costs.costPer1kOutput;
+      (totalInputTokens / 1000) * costs.costPer1kInput +
+      (totalOutputTokens / 1000) * costs.costPer1kOutput;
 
     // Log API usage
     await prisma.apiUsageLog.create({
       data: {
         provider,
         model,
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
         costUsd: extractionCost,
         operation: 'extract-prices',
         durationMs: 0,
@@ -69,9 +116,9 @@ export async function runScrapeForQuery(queryId: string): Promise<ScrapeResult> 
     });
 
     // Save price snapshots
-    if (prices.length > 0) {
+    if (allPrices.length > 0) {
       await prisma.priceSnapshot.createMany({
-        data: prices.map((p) => ({
+        data: allPrices.map((p) => ({
           queryId,
           travelDate: new Date(p.travelDate),
           price: p.price,
@@ -86,20 +133,25 @@ export async function runScrapeForQuery(queryId: string): Promise<ScrapeResult> 
     }
 
     // Build error message for 0-result runs
+    const failureReason = allPrices.length === 0 ? lastFailureReason : undefined;
     const failureMessages: Record<string, string> = {
-      page_not_loaded: 'Google Flights did not load results — page blocked, CAPTCHA, or timeout. [data-gs] selector not found.',
+      page_not_loaded: 'Page did not load results — blocked, CAPTCHA, or timeout.',
       no_json_in_response: 'LLM response contained no parseable JSON array. Page HTML may be a consent wall, error page, or empty shell.',
       empty_extraction: 'LLM parsed the page but returned 0 flights. Page likely loaded without flight content (rate-limited or empty response).',
       all_filtered_out: 'Flights were extracted but all removed by query filters (price/stops/airline).',
     };
     const errorMsg = failureReason ? failureMessages[failureReason] : undefined;
 
+    // Track which source(s) were used
+    const sourceLabel = sources.size === 1 ? [...sources][0]! : [...sources].join('+');
+
     // Update fetch run
     await prisma.fetchRun.update({
       where: { id: fetchRun.id },
       data: {
-        status: prices.length > 0 ? 'success' : 'failed',
-        snapshotsCount: prices.length,
+        status: allPrices.length > 0 ? 'success' : 'failed',
+        source: sourceLabel,
+        snapshotsCount: allPrices.length,
         extractionCost,
         error: errorMsg,
         completedAt: new Date(),
@@ -108,8 +160,8 @@ export async function runScrapeForQuery(queryId: string): Promise<ScrapeResult> 
 
     return {
       queryId,
-      status: prices.length > 0 ? 'success' : 'failed',
-      snapshotsCount: prices.length,
+      status: allPrices.length > 0 ? 'success' : 'failed',
+      snapshotsCount: allPrices.length,
       extractionCost,
       error: errorMsg,
     };
