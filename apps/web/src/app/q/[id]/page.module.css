@@ -110,6 +110,45 @@
   margin-top: 0.25rem;
 }
 
+/* Route blocks (multi-route subplots) */
+.routeBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.routeBlock + .routeBlock {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.routeBlockHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.routeBlockCode {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.routeBlockArrow {
+  font-size: 1.25rem;
+  color: var(--muted);
+}
+
+.routeBlockName {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-left: 0.5rem;
+}
+
 /* Sections */
 .chart,
 .best,

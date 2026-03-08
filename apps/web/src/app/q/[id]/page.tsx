@@ -41,25 +41,43 @@ function daysUntil(d: Date): number {
   return Math.max(0, Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
 }
 
-export default async function ChartPage({ params }: Props) {
-  const { id } = await params;
+interface QueryWithSnapshots {
+  query: {
+    id: string;
+    rawInput: string;
+    origin: string;
+    originName: string;
+    destination: string;
+    destinationName: string;
+    dateFrom: Date;
+    dateTo: Date;
+    flexibility: number;
+    expiresAt: Date;
+    createdAt: Date;
+    firstViewedAt: Date | null;
+    groupId: string | null;
+  };
+  snapshots: Array<{
+    id: string;
+    travelDate: string;
+    price: number;
+    currency: string;
+    airline: string;
+    bookingUrl: string;
+    stops: number;
+    duration: string | null;
+    flightId: string | null;
+    seatsLeft: number | null;
+    status: string;
+    airlineDirectPrice: number | null;
+    scrapedAt: string;
+  }>;
+  lastRun: { startedAt: Date } | null;
+}
 
-  const query = await prisma.query.findUnique({
-    where: { id },
-  });
-
-  if (!query) notFound();
-
-  // Mark first view for 24h auto-cleanup
-  if (!query.firstViewedAt) {
-    await prisma.query.update({
-      where: { id },
-      data: { firstViewedAt: new Date() },
-    });
-  }
-
-  const expired = new Date() > query.expiresAt;
-  const daysLeft = daysUntil(query.expiresAt);
+async function loadQueryWithSnapshots(id: string): Promise<QueryWithSnapshots | null> {
+  const query = await prisma.query.findUnique({ where: { id } });
+  if (!query) return null;
 
   const snapshots = await prisma.priceSnapshot.findMany({
     where: { queryId: id },
@@ -87,19 +105,69 @@ export default async function ChartPage({ params }: Props) {
     select: { startedAt: true },
   });
 
-  const serialized = snapshots.map((s) => ({
-    ...s,
-    travelDate: s.travelDate.toISOString(),
-    scrapedAt: s.scrapedAt.toISOString(),
-  }));
+  return {
+    query,
+    snapshots: snapshots.map((s) => ({
+      ...s,
+      travelDate: s.travelDate.toISOString(),
+      scrapedAt: s.scrapedAt.toISOString(),
+    })),
+    lastRun,
+  };
+}
+
+export default async function ChartPage({ params }: Props) {
+  const { id } = await params;
+
+  const primary = await loadQueryWithSnapshots(id);
+  if (!primary) notFound();
+
+  // Mark first view for 24h auto-cleanup
+  if (!primary.query.firstViewedAt) {
+    await prisma.query.update({
+      where: { id },
+      data: { firstViewedAt: new Date() },
+    });
+  }
+
+  // Fetch sibling queries if this is part of a group
+  const allQueries: QueryWithSnapshots[] = [primary];
+
+  if (primary.query.groupId) {
+    const siblings = await prisma.query.findMany({
+      where: {
+        groupId: primary.query.groupId,
+        id: { not: id },
+      },
+      select: { id: true },
+    });
+
+    for (const sibling of siblings) {
+      const data = await loadQueryWithSnapshots(sibling.id);
+      if (data) {
+        // Mark sibling first view too
+        if (!data.query.firstViewedAt) {
+          await prisma.query.update({
+            where: { id: sibling.id },
+            data: { firstViewedAt: new Date() },
+          });
+        }
+        allQueries.push(data);
+      }
+    }
+  }
+
+  const isMultiRoute = allQueries.length > 1;
+  const expired = new Date() > primary.query.expiresAt;
+  const daysLeft = daysUntil(primary.query.expiresAt);
 
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
       {
         '@type': 'WebPage',
-        name: `${query.originName} to ${query.destinationName} Flight Prices`,
-        description: `Flight price tracker for ${query.origin} → ${query.destination}`,
+        name: `${primary.query.originName} to ${primary.query.destinationName} Flight Prices`,
+        description: `Flight price tracker for ${primary.query.origin} → ${primary.query.destination}`,
         url: `https://fairtrail.org/q/${id}`,
         isPartOf: { '@type': 'WebSite', name: 'Fairtrail', url: 'https://fairtrail.org' },
       },
@@ -107,7 +175,7 @@ export default async function ChartPage({ params }: Props) {
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://fairtrail.org' },
-          { '@type': 'ListItem', position: 2, name: `${query.origin} → ${query.destination}`, item: `https://fairtrail.org/q/${id}` },
+          { '@type': 'ListItem', position: 2, name: `${primary.query.origin} → ${primary.query.destination}`, item: `https://fairtrail.org/q/${id}` },
         ],
       },
     ],
@@ -123,23 +191,43 @@ export default async function ChartPage({ params }: Props) {
         <Link href="/" className={styles.brand}>Fairtrail</Link>
         <ThemeToggle />
       </nav>
+
       <header className={styles.header}>
-        <div className={styles.route}>
-          <span className={styles.code}>{query.origin}</span>
-          <span className={styles.arrow}>→</span>
-          <span className={styles.code}>{query.destination}</span>
-        </div>
-        <div className={styles.meta}>
-          <span>{query.originName} to {query.destinationName}</span>
-          <span className={styles.sep}>·</span>
-          <span>{formatDate(query.dateFrom)} — {formatDate(query.dateTo)}</span>
-          {query.flexibility > 0 && (
-            <>
+        {isMultiRoute ? (
+          <>
+            <div className={styles.meta}>
+              <span>{primary.query.rawInput}</span>
+            </div>
+            <div className={styles.meta}>
+              <span>{formatDate(primary.query.dateFrom)} — {formatDate(primary.query.dateTo)}</span>
+              {primary.query.flexibility > 0 && (
+                <>
+                  <span className={styles.sep}>·</span>
+                  <span>±{primary.query.flexibility}d</span>
+                </>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className={styles.route}>
+              <span className={styles.code}>{primary.query.origin}</span>
+              <span className={styles.arrow}>→</span>
+              <span className={styles.code}>{primary.query.destination}</span>
+            </div>
+            <div className={styles.meta}>
+              <span>{primary.query.originName} to {primary.query.destinationName}</span>
               <span className={styles.sep}>·</span>
-              <span>±{query.flexibility}d</span>
-            </>
-          )}
-        </div>
+              <span>{formatDate(primary.query.dateFrom)} — {formatDate(primary.query.dateTo)}</span>
+              {primary.query.flexibility > 0 && (
+                <>
+                  <span className={styles.sep}>·</span>
+                  <span>±{primary.query.flexibility}d</span>
+                </>
+              )}
+            </div>
+          </>
+        )}
         <div className={styles.expiry}>
           {expired ? (
             <span className={styles.expiredBadge}>Expired</span>
@@ -151,28 +239,43 @@ export default async function ChartPage({ params }: Props) {
 
       {expired ? (
         <div className={styles.expiredNotice}>
-          <p>This tracker expired on {formatDate(query.expiresAt)}.</p>
+          <p>This tracker expired on {formatDate(primary.query.expiresAt)}.</p>
           <p>The data below is a snapshot of prices collected during the tracking period.</p>
         </div>
       ) : null}
 
-      <section className={styles.chart}>
-        <PriceChart snapshots={serialized} />
-      </section>
+      {allQueries.map((qData) => (
+        <div key={qData.query.id} className={styles.routeBlock}>
+          {isMultiRoute && (
+            <div className={styles.routeBlockHeader}>
+              <span className={styles.routeBlockCode}>{qData.query.origin}</span>
+              <span className={styles.routeBlockArrow}>→</span>
+              <span className={styles.routeBlockCode}>{qData.query.destination}</span>
+              <span className={styles.routeBlockName}>
+                {qData.query.originName} to {qData.query.destinationName}
+              </span>
+            </div>
+          )}
 
-      <section className={styles.best}>
-        <BestPrice snapshots={serialized} />
-      </section>
+          <section className={styles.chart}>
+            <PriceChart snapshots={qData.snapshots} />
+          </section>
 
-      <section className={styles.history}>
-        <PriceHistory snapshots={serialized} />
-      </section>
+          <section className={styles.best}>
+            <BestPrice snapshots={qData.snapshots} />
+          </section>
+
+          <section className={styles.history}>
+            <PriceHistory snapshots={qData.snapshots} />
+          </section>
+        </div>
+      ))}
 
       <footer className={styles.footer}>
         <div className={styles.footerRow}>
           <p>
-            Tracked since {formatDate(query.createdAt)}
-            {lastRun && ` · Last checked ${timeAgo(lastRun.startedAt)}`}
+            Tracked since {formatDate(primary.query.createdAt)}
+            {allQueries[0]?.lastRun && ` · Last checked ${timeAgo(allQueries[0].lastRun.startedAt)}`}
           </p>
           {!expired && <DeleteTracker queryId={id} />}
         </div>
