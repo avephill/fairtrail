@@ -15,6 +15,7 @@ export interface ParsedQuery {
   preferredAirlines: string[];
   timePreference: string;
   cabinClass: string;
+  tripType: string;
 }
 
 function formatDate(iso: string): string {
@@ -68,14 +69,26 @@ export function ConfirmationCard({
           <span className={styles.city}>{parsed.originName}</span>
         </div>
         <div className={styles.arrow}>
-          <svg width="32" height="16" viewBox="0 0 32 16" fill="none">
-            <path d="M0 8h28M22 2l6 6-6 6" stroke="currentColor" strokeWidth="1.5" />
-          </svg>
+          {parsed.tripType === 'one_way' ? (
+            <svg width="32" height="16" viewBox="0 0 32 16" fill="none">
+              <path d="M0 8h28M22 2l6 6-6 6" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          ) : (
+            <svg width="32" height="16" viewBox="0 0 32 16" fill="none">
+              <path d="M0 5h28M22 1l4 4-4 4" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M32 11H4M10 15l-4-4 4-4" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          )}
         </div>
         <div className={styles.airport}>
           <span className={styles.code}>{parsed.destination}</span>
           <span className={styles.city}>{parsed.destinationName}</span>
         </div>
+      </div>
+      <div className={styles.filters}>
+        <span className={styles.tag}>
+          {parsed.tripType === 'one_way' ? 'One way' : 'Round trip'}
+        </span>
       </div>
 
       <div className={styles.details}>

@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     preferredAirlines,
     timePreference,
     cabinClass,
+    tripType,
     selectedFlights,
   } = body;
 
@@ -45,7 +46,8 @@ export async function POST(request: NextRequest) {
     return apiError('Invalid date format', 400);
   }
 
-  if (from >= to) {
+  const isOneWay = tripType === 'one_way';
+  if (!isOneWay && from >= to) {
     return apiError('dateFrom must be before dateTo', 400);
   }
 
@@ -79,6 +81,7 @@ export async function POST(request: NextRequest) {
       preferredAirlines: airlines,
       timePreference: timePreference || 'any',
       cabinClass: cabinClass || 'economy',
+      tripType: tripType === 'one_way' ? 'one_way' : 'round_trip',
       expiresAt,
       deleteToken,
     },

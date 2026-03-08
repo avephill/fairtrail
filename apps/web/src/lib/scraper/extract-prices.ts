@@ -10,6 +10,8 @@ export interface PriceData {
   bookingUrl: string;
   stops: number;
   duration: string | null;
+  departureTime: string | null; // e.g. "10:25 AM"
+  seatsLeft: number | null; // e.g. 3 when "3 seats left" shown
 }
 
 export interface QueryFilters {
@@ -71,7 +73,9 @@ Return ONLY valid JSON — an array of UP TO ${maxResults} objects with this exa
     "airline": "Delta",
     "bookingUrl": "https://...",
     "stops": 1,
-    "duration": "11h 20m"
+    "duration": "11h 20m",
+    "departureTime": "10:25 AM",
+    "seatsLeft": 3
   }
 ]
 ${filterSection}
@@ -81,6 +85,8 @@ General rules:
 ${bookingUrlRule}
 - stops: 0 for nonstop, 1 for 1 stop, etc.
 - duration: human-readable format like "8h 30m"
+- departureTime: the departure time as shown (e.g. "10:25 AM", "7:50 PM"). Use null if not visible
+- seatsLeft: if the page shows "N seats left" or "N seats left at this price", extract the number. Use null if not shown
 - If the travel date is not clearly visible per result, use the search date provided
 - Prefer variety: if multiple airlines are available, include at least one from each (up to the ${maxResults} limit)
 - Return ONLY the JSON array, no markdown, no explanation

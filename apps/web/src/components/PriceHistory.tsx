@@ -8,6 +8,10 @@ interface Snapshot {
   bookingUrl: string;
   stops: number;
   duration: string | null;
+  flightId: string | null;
+  seatsLeft: number | null;
+  status: string;
+  airlineDirectPrice: number | null;
   scrapedAt: string;
 }
 
@@ -61,6 +65,7 @@ export function PriceHistory({ snapshots }: { snapshots: Snapshot[] }) {
               <th>Price</th>
               <th>Change</th>
               <th>Stops</th>
+              <th>Seats</th>
               <th></th>
             </tr>
           </thead>
@@ -86,15 +91,28 @@ export function PriceHistory({ snapshots }: { snapshots: Snapshot[] }) {
                   <td className={styles.stops}>
                     {s.stops === 0 ? 'Direct' : `${s.stops} stop${s.stops > 1 ? 's' : ''}`}
                   </td>
+                  <td className={styles.seats}>
+                    {s.status === 'sold_out' ? (
+                      <span className={styles.soldOut}>Sold out</span>
+                    ) : s.seatsLeft !== null ? (
+                      <span className={s.seatsLeft <= 3 ? styles.seatsLow : styles.seatsNormal}>
+                        {s.seatsLeft} left
+                      </span>
+                    ) : null}
+                  </td>
                   <td>
-                    <a
-                      href={s.bookingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.bookLink}
-                    >
-                      Book
-                    </a>
+                    {s.status === 'sold_out' ? (
+                      <span className={styles.soldOutLabel}>&mdash;</span>
+                    ) : (
+                      <a
+                        href={s.bookingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.bookLink}
+                      >
+                        Book
+                      </a>
+                    )}
                   </td>
                 </tr>
               );

@@ -14,6 +14,7 @@ export interface ParsedFlightQuery {
   preferredAirlines: string[]; // empty = no preference
   timePreference: 'any' | 'morning' | 'afternoon' | 'evening' | 'redeye';
   cabinClass: 'economy' | 'premium_economy' | 'business' | 'first';
+  tripType: 'one_way' | 'round_trip';
 }
 
 export interface ParseAmbiguity {
@@ -49,7 +50,8 @@ Return ONLY valid JSON with this exact shape:
     "maxStops": number or null (0 if "nonstop"/"direct", 1 if "max 1 stop", null if no preference),
     "preferredAirlines": ["Delta", "United"] or [] if no preference,
     "timePreference": "any" | "morning" | "afternoon" | "evening" | "redeye",
-    "cabinClass": "economy" | "premium_economy" | "business" | "first"
+    "cabinClass": "economy" | "premium_economy" | "business" | "first",
+    "tripType": "one_way" | "round_trip"
   }
 }
 
@@ -77,6 +79,7 @@ Parsing rules:
 - If the user says "flexible" without specifying days, use flexibility of 3
 - Default cabinClass to "economy" unless stated otherwise
 - Default timePreference to "any" unless stated
+- tripType: "one_way" if no return date is mentioned or user says "one way"; "round_trip" if a return date is given or user says "round trip" or "return". Default to "one_way" when ambiguous (no return info)
 - Extract airline preferences if mentioned
 - Extract price caps if mentioned (e.g. "under $800")
 - If no stop preference stated, maxStops is null

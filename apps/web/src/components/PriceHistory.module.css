@@ -95,3 +95,30 @@
 .bookLink:hover {
   text-decoration: underline;
 }
+
+.seats {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.seatsLow {
+  color: var(--price-up);
+  font-weight: 600;
+}
+
+.seatsNormal {
+  color: var(--text-secondary);
+}
+
+.soldOut {
+  color: var(--price-up);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.soldOutLabel {
+  color: var(--muted);
+}

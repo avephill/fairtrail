@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   if (!body) return apiError('Invalid JSON body', 400);
 
-  const { origin, destination, dateFrom, dateTo, maxPrice, maxStops, preferredAirlines, timePreference, cabinClass } = body;
+  const { origin, destination, dateFrom, dateTo, maxPrice, maxStops, preferredAirlines, timePreference, cabinClass, tripType } = body;
 
   if (!origin || !destination || !dateFrom || !dateTo) {
     return apiError('Missing required fields: origin, destination, dateFrom, dateTo', 400);
@@ -49,7 +49,8 @@ export async function POST(request: NextRequest) {
     return apiError('Invalid date format', 400);
   }
 
-  if (from >= to) {
+  const isOneWay = tripType === 'one_way';
+  if (!isOneWay && from >= to) {
     return apiError('dateFrom must be before dateTo', 400);
   }
 
@@ -63,6 +64,7 @@ export async function POST(request: NextRequest) {
         dateFrom: from,
         dateTo: to,
         cabinClass: cabinClass || 'economy',
+        tripType: tripType || 'round_trip',
       };
 
       const airlines: string[] = Array.isArray(preferredAirlines) ? preferredAirlines : [];

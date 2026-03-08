@@ -22,6 +22,7 @@ model Query {
   preferredAirlines String[] @default([])
   timePreference  String   @default("any")
   cabinClass      String   @default("economy")
+  tripType        String   @default("round_trip") // 'one_way' | 'round_trip'
   deleteToken     String?
   active          Boolean  @default(true)
   isSeed          Boolean  @default(false)
@@ -41,23 +42,28 @@ model Query {
 }
 
 model PriceSnapshot {
-  id         String   @id @default(cuid())
-  queryId    String
-  travelDate DateTime
-  price      Float
-  currency   String   @default("USD")
-  airline    String
-  bookingUrl String
-  stops      Int      @default(0)
-  duration   String?
-  scrapedAt  DateTime @default(now())
-  fetchRunId String?
+  id                String   @id @default(cuid())
+  queryId           String
+  travelDate        DateTime
+  price             Float
+  currency          String   @default("USD")
+  airline           String
+  bookingUrl        String
+  stops             Int      @default(0)
+  duration          String?
+  flightId          String?  // stable identity: airline-HHMM-origin-dest-date
+  seatsLeft         Int?
+  status            String   @default("available") // 'available' | 'sold_out'
+  airlineDirectPrice Float?
+  scrapedAt         DateTime @default(now())
+  fetchRunId        String?
 
   query    Query     @relation(fields: [queryId], references: [id], onDelete: Cascade)
   fetchRun FetchRun? @relation(fields: [fetchRunId], references: [id])
 
   @@index([queryId, scrapedAt])
   @@index([queryId, airline])
+  @@index([queryId, flightId])
 }
 
 model FetchRun {

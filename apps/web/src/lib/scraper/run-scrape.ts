@@ -31,8 +31,9 @@ export async function runScrapeForQuery(queryId: string): Promise<ScrapeResult> 
           dateFrom: new Date(),
           dateTo: new Date(Date.now() + query.lookAheadDays * 24 * 60 * 60 * 1000),
           cabinClass: query.cabinClass,
+          tripType: query.tripType,
         }
-      : { ...query, cabinClass: query.cabinClass };
+      : { ...query, cabinClass: query.cabinClass, tripType: query.tripType };
 
     // Route: airline-direct for single known airline, Google Flights otherwise
     const directAirlines = query.preferredAirlines.filter(isKnownAirline);
@@ -115,10 +116,47 @@ export async function runScrapeForQuery(queryId: string): Promise<ScrapeResult> 
       },
     });
 
+    // Build stable flightId for each price
+    const withFlightIds = allPrices.map((p) => {
+      const timePart = (p.departureTime ?? '').replace(/[^0-9]/g, '') || '0000';
+      const airlinePart = p.airline.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+      const flightId = `${airlinePart}-${timePart}-${query.origin}-${query.destination}-${p.travelDate}`;
+      return { ...p, flightId };
+    });
+
+    // Sold-out detection: compare with previous scrape
+    const previousSnapshots = await prisma.priceSnapshot.findMany({
+      where: {
+        queryId,
+        flightId: { not: null },
+        status: 'available',
+      },
+      orderBy: { scrapedAt: 'desc' },
+      distinct: ['flightId'],
+      select: { flightId: true, price: true, airline: true, travelDate: true, currency: true, bookingUrl: true, stops: true, duration: true },
+    });
+
+    const currentFlightIds = new Set(withFlightIds.map((p) => p.flightId));
+    const soldOutSnapshots = previousSnapshots
+      .filter((prev) => prev.flightId && !currentFlightIds.has(prev.flightId))
+      .map((prev) => ({
+        queryId,
+        travelDate: prev.travelDate,
+        price: prev.price,
+        currency: prev.currency,
+        airline: prev.airline,
+        bookingUrl: prev.bookingUrl,
+        stops: prev.stops,
+        duration: prev.duration,
+        flightId: prev.flightId,
+        status: 'sold_out' as const,
+        fetchRunId: fetchRun.id,
+      }));
+
     // Save price snapshots
-    if (allPrices.length > 0) {
+    if (withFlightIds.length > 0) {
       await prisma.priceSnapshot.createMany({
-        data: allPrices.map((p) => ({
+        data: withFlightIds.map((p) => ({
           queryId,
           travelDate: new Date(p.travelDate),
           price: p.price,
@@ -127,8 +165,17 @@ export async function runScrapeForQuery(queryId: string): Promise<ScrapeResult> 
           bookingUrl: p.bookingUrl,
           stops: p.stops,
           duration: p.duration,
+          flightId: p.flightId,
+          seatsLeft: p.seatsLeft ?? null,
           fetchRunId: fetchRun.id,
         })),
+      });
+    }
+
+    // Record sold-out flights
+    if (soldOutSnapshots.length > 0) {
+      await prisma.priceSnapshot.createMany({
+        data: soldOutSnapshots,
       });
     }
 

@@ -73,6 +73,10 @@ export default async function ChartPage({ params }: Props) {
       bookingUrl: true,
       stops: true,
       duration: true,
+      flightId: true,
+      seatsLeft: true,
+      status: true,
+      airlineDirectPrice: true,
       scrapedAt: true,
     },
   });
