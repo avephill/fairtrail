@@ -1,21 +1,74 @@
-import { CronJob } from 'cron';
+const JITTER_RANGE_SECONDS = 150; // ±2.5 min → 5 min total window
 
-let cronJob: CronJob | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
 let cronIntervalHours = 3;
 let lastScrapeAt: Date | null = null;
+let nextScrapeAt: Date | null = null;
+let jitterSeconds: number | null = null;
 
-export function getNextScrapeTime(): string | null {
-  if (!cronJob) return null;
-  try {
-    return cronJob.nextDate().toISO() ?? null;
-  } catch {
-    return null;
-  }
+function computeJitter(): number {
+  return Math.round((Math.random() * 2 - 1) * JITTER_RANGE_SECONDS);
 }
 
-export function getCronInfo(): { intervalHours: number; nextScrape: string | null; lastScrape: string | null } {
+function formatDuration(ms: number): string {
+  const totalSec = Math.round(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (s > 0 || parts.length === 0) parts.push(`${s}s`);
+  return parts.join(' ');
+}
+
+function scheduleNext() {
+  const baseMs = cronIntervalHours * 60 * 60 * 1000;
+  const jitter = computeJitter();
+  const delayMs = baseMs + jitter * 1000;
+
+  jitterSeconds = jitter;
+  nextScrapeAt = new Date(Date.now() + delayMs);
+
+  const sign = jitter >= 0 ? '+' : '';
+  console.log(`[cron] Next scrape in ${formatDuration(delayMs)} (jitter: ${sign}${jitter}s), at ${nextScrapeAt.toISOString()}`);
+
+  timer = setTimeout(runAndReschedule, delayMs);
+}
+
+async function runAndReschedule() {
+  console.log(`[cron] Starting scheduled scrape...`);
+  try {
+    const { runScrapeAll, cleanupUnvisitedQueries } = await import('./scraper/run-scrape');
+
+    await cleanupUnvisitedQueries();
+    const results = await runScrapeAll();
+    lastScrapeAt = new Date();
+
+    const successful = results.filter((r) => r.status === 'success').length;
+    const failed = results.filter((r) => r.status === 'failed').length;
+    const snapshots = results.reduce((sum, r) => sum + r.snapshotsCount, 0);
+    console.log(`[cron] Scrape complete: ${successful} ok, ${failed} failed, ${snapshots} snapshots`);
+  } catch (err) {
+    console.error('[cron] Scrape failed:', err instanceof Error ? err.message : err);
+  }
+
+  scheduleNext();
+}
+
+export function getNextScrapeTime(): string | null {
+  return nextScrapeAt?.toISOString() ?? null;
+}
+
+export function getCronInfo(): {
+  intervalHours: number;
+  jitterSeconds: number | null;
+  nextScrape: string | null;
+  lastScrape: string | null;
+} {
   return {
     intervalHours: cronIntervalHours,
+    jitterSeconds,
     nextScrape: getNextScrapeTime(),
     lastScrape: lastScrapeAt?.toISOString() ?? null,
   };
@@ -28,35 +81,17 @@ export function startCron() {
   }
 
   cronIntervalHours = Math.max(1, parseInt(process.env.CRON_INTERVAL_HOURS ?? '3', 10));
-  const cronExpression = `0 */${cronIntervalHours} * * *`;
 
-  cronJob = new CronJob(cronExpression, async () => {
-    console.log(`[cron] Starting scheduled scrape...`);
-    try {
-      // Dynamic import to avoid circular dependencies at startup
-      const { runScrapeAll, cleanupUnvisitedQueries } = await import('./scraper/run-scrape');
-
-      await cleanupUnvisitedQueries();
-      const results = await runScrapeAll();
-      lastScrapeAt = new Date();
-
-      const successful = results.filter((r) => r.status === 'success').length;
-      const failed = results.filter((r) => r.status === 'failed').length;
-      const snapshots = results.reduce((sum, r) => sum + r.snapshotsCount, 0);
-      console.log(`[cron] Scrape complete: ${successful} ok, ${failed} failed, ${snapshots} snapshots`);
-    } catch (err) {
-      console.error('[cron] Scrape failed:', err instanceof Error ? err.message : err);
-    }
-  });
-
-  cronJob.start();
-  console.log(`[cron] Scheduled every ${cronIntervalHours}h (${cronExpression}), next: ${cronJob.nextDate().toISO()}`);
+  console.log(`[cron] Starting with ${cronIntervalHours}h base interval (±${JITTER_RANGE_SECONDS}s jitter)`);
+  scheduleNext();
 }
 
 export function stopCron() {
-  if (cronJob) {
-    cronJob.stop();
-    cronJob = null;
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+    nextScrapeAt = null;
+    jitterSeconds = null;
     console.log('[cron] Stopped');
   }
 }
