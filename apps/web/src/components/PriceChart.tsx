@@ -15,6 +15,10 @@ interface Snapshot {
   bookingUrl: string;
   stops: number;
   duration: string | null;
+  flightId: string | null;
+  seatsLeft: number | null;
+  status: string;
+  airlineDirectPrice: number | null;
   scrapedAt: string;
 }
 
@@ -43,15 +47,18 @@ function getAirlineColor(airline: string, index: number): string {
 
 export function PriceChart({ snapshots }: { snapshots: Snapshot[] }) {
   const traces = useMemo(() => {
+    const available = snapshots.filter((s) => s.status !== 'sold_out');
+    const soldOut = snapshots.filter((s) => s.status === 'sold_out');
+
     const byAirline = new Map<string, Snapshot[]>();
-    for (const s of snapshots) {
+    for (const s of available) {
       const existing = byAirline.get(s.airline) ?? [];
       existing.push(s);
       byAirline.set(s.airline, existing);
     }
 
     let idx = 0;
-    return Array.from(byAirline.entries()).map(([airline, points]) => {
+    const result = Array.from(byAirline.entries()).map(([airline, points]) => {
       const color = getAirlineColor(airline, idx++);
       return {
         x: points.map((p) => p.scrapedAt),
@@ -61,7 +68,7 @@ export function PriceChart({ snapshots }: { snapshots: Snapshot[] }) {
         name: airline,
         line: { color, width: 2 },
         marker: { color, size: 6 },
-        customdata: points.map((p) => [p.bookingUrl, p.stops, p.duration, p.currency]),
+        customdata: points.map((p) => [p.bookingUrl, p.stops, p.duration, p.currency, p.seatsLeft]),
         hovertemplate:
           '<b>%{y:$.2f}</b> %{customdata[3]}<br>' +
           '%{x|%b %d, %H:%M}<br>' +
@@ -69,6 +76,25 @@ export function PriceChart({ snapshots }: { snapshots: Snapshot[] }) {
           '<extra>%{fullData.name}</extra>',
       };
     });
+
+    if (soldOut.length > 0) {
+      result.push({
+        x: soldOut.map((p) => p.scrapedAt),
+        y: soldOut.map((p) => p.price),
+        type: 'scatter' as const,
+        mode: 'lines+markers' as const,
+        name: 'Sold out',
+        line: { color: '#ef4444', width: 0 },
+        marker: { color: '#ef4444', size: 10 },
+        customdata: soldOut.map((p) => [p.bookingUrl, p.stops, p.duration, p.currency, p.seatsLeft]),
+        hovertemplate:
+          '<b>%{y:$.2f}</b> (sold out)<br>' +
+          '%{x|%b %d, %H:%M}<br>' +
+          '<extra>Sold out</extra>',
+      });
+    }
+
+    return result;
   }, [snapshots]);
 
   if (snapshots.length === 0) {
