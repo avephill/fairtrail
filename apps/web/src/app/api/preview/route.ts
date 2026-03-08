@@ -46,12 +46,13 @@ interface ScrapeRouteParams {
   maxStops: number | null;
   preferredAirlines: string[];
   timePreference: string;
+  currency: string;
 }
 
 async function scrapeRoute(params: ScrapeRouteParams): Promise<PriceData[]> {
   const { origin, destination, dateFrom, dateTo, dateFromStr, cabinClass, tripType } = params;
 
-  const searchParams = { origin, destination, dateFrom, dateTo, cabinClass, tripType };
+  const searchParams = { origin, destination, dateFrom, dateTo, cabinClass, tripType, currency: params.currency };
   const airlines: string[] = params.preferredAirlines;
   const directAirline = airlines.length === 1 && isKnownAirline(airlines[0]!) ? airlines[0]! : null;
   const filters = {
@@ -93,7 +94,8 @@ async function scrapeRoute(params: ScrapeRouteParams): Promise<PriceData[]> {
       filters,
       PREVIEW_MAX_RESULTS,
       nav.resultsFound,
-      nav.source
+      nav.source,
+      params.currency
     );
 
     totalInputTokens += usage.inputTokens;
@@ -176,7 +178,8 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   if (!body) return apiError('Invalid JSON body', 400);
 
-  const { dateFrom, dateTo, maxPrice, maxStops, preferredAirlines, timePreference, cabinClass, tripType } = body;
+  const { dateFrom, dateTo, maxPrice, maxStops, preferredAirlines, timePreference, cabinClass, tripType, currency: bodyCurrency } = body;
+  const currency: string = typeof bodyCurrency === 'string' && bodyCurrency ? bodyCurrency : 'USD';
 
   // Accept either arrays (new) or single values (legacy)
   const origins: Airport[] = Array.isArray(body.origins)
@@ -240,6 +243,7 @@ export async function POST(request: NextRequest) {
             maxStops: maxStops !== undefined && maxStops !== null ? Number(maxStops) : null,
             preferredAirlines: airlines,
             timePreference: timePreference || 'any',
+            currency,
           })
         );
 
