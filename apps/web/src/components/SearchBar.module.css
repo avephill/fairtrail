@@ -93,6 +93,21 @@
   font-family: var(--font-mono);
 }
 
+.hintBtn {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.hintBtn:hover {
+  color: var(--accent);
+}
+
 .hintSep {
   color: var(--border);
 }

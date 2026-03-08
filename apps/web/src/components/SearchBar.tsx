@@ -16,13 +16,13 @@ interface ConversationMessage {
   content: string;
 }
 
-export function SearchBar() {
+export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
   const [inviteValid, setInviteValid] = useState<boolean | null>(null);
   const [inviteCode, setInviteCode] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery ?? '');
   const [parsed, setParsed] = useState<ParsedQuery | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -360,11 +360,18 @@ export function SearchBar() {
       </div>
 
       <div className={styles.hints}>
-        <span className={styles.hint}>JFK to CDG June 15-20</span>
-        <span className={styles.hintSep}>&middot;</span>
-        <span className={styles.hint}>London to Tokyo next month flexible</span>
-        <span className={styles.hintSep}>&middot;</span>
-        <span className={styles.hint}>SFO &rarr; LAX March 20 &plusmn; 2 days</span>
+        {['JFK to CDG June 15-20', 'London to Tokyo next month flexible', 'SFO to LAX March 20 ± 2 days'].map((example, i) => (
+          <span key={i}>
+            {i > 0 && <span className={styles.hintSep}>&middot; </span>}
+            <button
+              type="button"
+              className={styles.hintBtn}
+              onClick={() => { setQuery(example); inputRef.current?.focus(); }}
+            >
+              {example}
+            </button>
+          </span>
+        ))}
       </div>
 
       {error && (

@@ -192,6 +192,20 @@
   border-color: var(--accent);
 }
 
+.empty {
+  padding: 1.5rem;
+  text-align: center;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+
+.emptyText {
+  font-size: 0.875rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 @media (max-width: 640px) {
   .card {
     min-width: 160px;

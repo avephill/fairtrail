@@ -155,7 +155,17 @@ export function SavedTrackers() {
     }
   };
 
-  if (trackers.length === 0) return null;
+  if (trackers.length === 0) {
+    return (
+      <div className={styles.root}>
+        <div className={styles.empty}>
+          <p className={styles.emptyText}>
+            No trackers yet. Search for a flight above to start tracking prices.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.root}>
