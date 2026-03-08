@@ -132,20 +132,20 @@ export function SearchBar() {
     const trimmed = query.trim();
     if (!trimmed || trimmed.length < 5) return;
 
-    const history: ConversationMessage[] = [];
+    const history: ConversationMessage[] = [{ role: 'user', content: trimmed }];
     setConversation(history);
     setAmbiguities([]);
     setPartialParsed(null);
     setParsed(null);
     setPreviewFlights(null);
 
-    await doParse(trimmed, history);
+    await doParse(trimmed, []);
   }, [query, doParse]);
 
   const handleAnswer = useCallback(async (answer: string) => {
-    const newHistory: ConversationMessage[] = [...conversation, { role: 'user', content: answer }];
-    setConversation(newHistory);
-    await doParse(answer, newHistory);
+    const newConversation: ConversationMessage[] = [...conversation, { role: 'user', content: answer }];
+    setConversation(newConversation);
+    await doParse(answer, conversation);
   }, [conversation, doParse]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
