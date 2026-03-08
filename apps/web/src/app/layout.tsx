@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import '@/styles/globals.css';
 import { ClientBeacon } from '@/components/analytics/ClientBeacon';
 
+const isSelfHosted = process.env.SELF_HOSTED === 'true';
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://fairtrail.org'),
   title: {
@@ -49,7 +51,7 @@ export default function RootLayout({
       </head>
       <body>
         {children}
-        <ClientBeacon />
+        {!isSelfHosted && <ClientBeacon />}
       </body>
     </html>
   );
