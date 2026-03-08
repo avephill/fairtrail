@@ -71,6 +71,103 @@ export async function navigateGoogleFlights(
   }
 }
 
+export interface FlightDetailResult {
+  airlineDirectPrice: number | null;
+  airlineDirectCurrency: string | null;
+  bookingUrl: string | null;
+  allBookingOptions: Array<{
+    provider: string;
+    isAirline: boolean;
+    price: number;
+    currency: string;
+  }>;
+}
+
+export async function navigateFlightDetail(
+  params: FlightSearchParams,
+  flightIndex: number
+): Promise<FlightDetailResult> {
+  const browser = await launchBrowser();
+
+  try {
+    const context = await createStealthContext(browser);
+    const page = await context.newPage();
+
+    // Must use one-way search so clicking goes directly to booking options
+    const url = buildGoogleFlightsUrl({ ...params, tripType: 'one_way' });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
+    await page.waitForTimeout(3000);
+
+    // Dismiss consent
+    try {
+      const consentButton = page.locator('button:has-text("Accept all")').first();
+      if (await consentButton.isVisible({ timeout: 2000 })) {
+        await consentButton.click();
+        await page.waitForTimeout(3000);
+      }
+    } catch {
+      // No consent dialog
+    }
+
+    // Wait for results
+    try {
+      await page.waitForSelector('li.pIav2d', { timeout: 15_000 });
+    } catch {
+      await context.close();
+      return { airlineDirectPrice: null, airlineDirectCurrency: null, bookingUrl: null, allBookingOptions: [] };
+    }
+
+    // Click the specific flight result
+    const flightItems = page.locator('li.pIav2d');
+    const count = await flightItems.count();
+    if (flightIndex >= count) {
+      await context.close();
+      return { airlineDirectPrice: null, airlineDirectCurrency: null, bookingUrl: null, allBookingOptions: [] };
+    }
+
+    await flightItems.nth(flightIndex).click();
+    await page.waitForTimeout(4000);
+
+    // Extract booking options from the detail view
+    // Google Flights renders "Book with LOTAirline\n$662" (Airline appended to name)
+    // or "Book with Mytrip\n$704" (no Airline tag for OTAs)
+    const result = await page.evaluate(() => {
+      const text = document.body.innerText ?? '';
+      const options: Array<{ provider: string; isAirline: boolean; price: number; currency: string }> = [];
+
+      const bookingPattern = /Book with (.+?)(?:Airline)?\n\$?([\d,]+)/g;
+      let match;
+      while ((match = bookingPattern.exec(text)) !== null) {
+        const rawProvider = match[1]!.trim();
+        // Check if the full match area contains "Airline" tag
+        const fullMatch = match[0]!;
+        const isAirline = /Airline/.test(fullMatch);
+        const provider = rawProvider.replace(/Airline$/, '').trim();
+        const price = parseInt(match[2]!.replace(/,/g, ''), 10);
+        if (!isNaN(price) && provider.length > 0) {
+          options.push({ provider, isAirline, price, currency: 'USD' });
+        }
+      }
+
+      return options;
+    });
+
+    await context.close();
+
+    // Find the airline-direct option (tagged as "Airline")
+    const airlineOption = result.find((o) => o.isAirline);
+
+    return {
+      airlineDirectPrice: airlineOption?.price ?? null,
+      airlineDirectCurrency: airlineOption?.currency ?? null,
+      bookingUrl: null, // booking URL requires following a redirect — use Google Flights link
+      allBookingOptions: result,
+    };
+  } finally {
+    await browser.close();
+  }
+}
+
 export async function navigateAirlineDirect(
   params: FlightSearchParams,
   airlineName: string
