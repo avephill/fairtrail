@@ -60,7 +60,31 @@
   --muted: #5a6f96;
 }
 
-/* ---- Light theme ---- */
+/* ---- Light theme — system preference fallback (before JS sets data-theme) ---- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+
+    --bg: #f5f2ec;
+    --surface: #ffffff;
+    --elevated: #ede9e1;
+    --border: #d5cfc4;
+
+    --accent: #0891b2;
+    --accent-dim: #b2e0ea;
+    --accent-glow: rgba(8, 145, 178, 0.08);
+    --accent-hover: #0e7490;
+
+    --text: #1a1f2e;
+    --text-secondary: #5a6275;
+    --muted: #8e95a5;
+
+    --price-up: #dc2626;
+    --price-down: #059669;
+  }
+}
+
+/* ---- Light theme — explicit (set by JS toggle) ---- */
 [data-theme='light'] {
   color-scheme: light;
 
