@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.2] - 2026-03-13
+
+### Fixed
+- `fairtrail: command not found` on Ubuntu — installer now auto-patches shell profile to add `~/.local/bin` to PATH ([#1](https://github.com/affromero/fairtrail/issues/1) — thanks @bobvmierlo)
+- `spawn codex ENOENT` in Docker — entrypoint installs CLI providers (codex, claude) inside the container when enabled, persisted via `cli-cache` volume ([#1](https://github.com/affromero/fairtrail/issues/1))
+- `xdg-open` error spam on headless Linux — guarded behind `DISPLAY`/`WAYLAND_DISPLAY` check ([#1](https://github.com/affromero/fairtrail/issues/1))
+- Install one-liner changed from `| sh` to `| bash` — the script uses bash-specific syntax that breaks under dash (Ubuntu default `sh`)
+- Codex CLI spawn now passes `env` to child process (was missing, unlike claude-code)
+- Actionable ENOENT error messages for CLI providers instead of raw stack traces
+
+### Added
+- Tests for CLI provider detection, ENOENT handling, and installer shell script correctness (18 new tests)
+
 ## [0.2.1] - 2026-03-09
 
 ### Added
