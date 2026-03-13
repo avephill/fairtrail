@@ -32,7 +32,27 @@ function hasGhostty(): boolean {
 
 function buildViewCommand(queryId: string): string {
   const cwd = process.cwd();
-  return `cd ${cwd} && doppler run -- node --import tsx/esm --import ./packages/cli/register.mjs packages/cli/src/index.tsx --view ${queryId}`;
+  const backend = process.env.FAIRTRAIL_BACKEND;
+  const backendFlag = backend ? ` --backend ${backend}` : '';
+  // Use the fairtrail wrapper if on PATH, otherwise fall back to raw command
+  try {
+    execSync('which fairtrail', { stdio: 'ignore' });
+    return `cd ${cwd} && fairtrail --headless --view ${queryId}${backendFlag}`;
+  } catch {
+    return `cd ${cwd} && doppler run -- node --import tsx/esm --import ./packages/cli/register.mjs packages/cli/src/index.tsx --headless --view ${queryId}${backendFlag}`;
+  }
+}
+
+function currentSession(): string {
+  return tmux('display-message', '-p', '#{session_name}');
+}
+
+function currentWindow(): string {
+  return tmux('display-message', '-p', '#{window_index}');
+}
+
+function currentPane(): string {
+  return tmux('display-message', '-p', '#{pane_index}');
 }
 
 export async function launchTmuxView(queryId: string): Promise<void> {
@@ -55,41 +75,60 @@ export async function launchTmuxView(queryId: string): Promise<void> {
     });
   }
 
-  console.log(`Found ${queries.length} route(s) — creating isolated tmux session...`);
+  console.log(`Found ${queries.length} route(s) — opening tmux panes...`);
   for (const q of queries) {
     console.log(`  ${q.origin} → ${q.destination}  (${q.dateFrom.toISOString().slice(0, 10)})`);
   }
 
-  // Always create a NEW isolated session — never touch the user's current tmux
-  try { tmux('kill-session', '-t', SESSION_NAME); } catch { /* ok if not found */ }
+  if (process.env.TMUX) {
+    // Inside tmux — split the CURRENT pane into sub-panes
+    const session = currentSession();
+    const win = currentWindow();
+    const pane = currentPane();
+    const target = `${session}:${win}.${pane}`;
 
-  tmux('new-session', '-d', '-s', SESSION_NAME, '-x', '220', '-y', '55');
+    // First command runs in the current pane
+    const firstCmd = buildViewCommand(queries[0]!.id);
+    tmux('send-keys', '-t', target, firstCmd, 'Enter');
 
-  // First pane already exists from new-session — send the first view command
-  const firstCmd = buildViewCommand(queries[0]!.id);
-  tmux('send-keys', '-t', `${SESSION_NAME}:0.0`, firstCmd, 'Enter');
+    // Split for remaining queries
+    for (let i = 1; i < queries.length; i++) {
+      const cmd = buildViewCommand(queries[i]!.id);
+      const splitDir = i % 2 === 1 ? '-h' : '-v';
+      tmux('split-window', splitDir, '-t', target);
+      tmux('send-keys', cmd, 'Enter');
+    }
 
-  // Split for remaining queries
-  for (let i = 1; i < queries.length; i++) {
-    const cmd = buildViewCommand(queries[i]!.id);
-    const splitDir = i % 2 === 1 ? '-h' : '-v';
-    tmux('split-window', splitDir, '-t', `${SESSION_NAME}:0`);
-    tmux('send-keys', '-t', `${SESSION_NAME}:0.${i}`, cmd, 'Enter');
-  }
-
-  tmux('select-layout', '-t', `${SESSION_NAME}:0`, 'tiled');
-  tmux('select-pane', '-t', `${SESSION_NAME}:0.0`);
-
-  // Open in a new Ghostty window (or attach in current terminal as fallback)
-  if (hasGhostty()) {
-    spawn('ghostty', ['-e', 'tmux', 'attach-session', '-t', SESSION_NAME], {
-      detached: true,
-      stdio: 'ignore',
-    }).unref();
-    console.log(`Opened new Ghostty window with ${queries.length} panes`);
+    tmux('select-layout', '-t', `${session}:${win}`, 'tiled');
+    console.log(`Split into ${queries.length} panes in current window`);
   } else {
-    console.log(`Attaching to tmux session "${SESSION_NAME}"...`);
-    spawnSync('tmux', ['attach-session', '-t', SESSION_NAME], { stdio: 'inherit' });
+    // Outside tmux — create a new session and open in Ghostty
+    try { tmux('kill-session', '-t', SESSION_NAME); } catch { /* ok */ }
+
+    tmux('new-session', '-d', '-s', SESSION_NAME, '-x', '220', '-y', '55');
+
+    const firstCmd = buildViewCommand(queries[0]!.id);
+    tmux('send-keys', '-t', `${SESSION_NAME}:0.0`, firstCmd, 'Enter');
+
+    for (let i = 1; i < queries.length; i++) {
+      const cmd = buildViewCommand(queries[i]!.id);
+      const splitDir = i % 2 === 1 ? '-h' : '-v';
+      tmux('split-window', splitDir, '-t', `${SESSION_NAME}:0`);
+      tmux('send-keys', '-t', `${SESSION_NAME}:0.${i}`, cmd, 'Enter');
+    }
+
+    tmux('select-layout', '-t', `${SESSION_NAME}:0`, 'tiled');
+    tmux('select-pane', '-t', `${SESSION_NAME}:0.0`);
+
+    if (hasGhostty()) {
+      spawn('ghostty', ['-e', 'tmux', 'attach-session', '-t', SESSION_NAME], {
+        detached: true,
+        stdio: 'ignore',
+      }).unref();
+      console.log(`Opened Ghostty window with ${queries.length} panes`);
+    } else {
+      spawnSync('tmux', ['attach-session', '-t', SESSION_NAME], { stdio: 'inherit' });
+    }
   }
 
   await prisma.$disconnect();
