@@ -23,7 +23,6 @@ export function SearchWizard() {
   const [progressMsg, setProgressMsg] = useState('');
   const [error, setError] = useState('');
   const [createdQueries, setCreatedQueries] = useState<CreatedQuery[]>([]);
-  const [currentRouteIdx, setCurrentRouteIdx] = useState(0);
 
   const handleParse = useCallback(async (input: string, history?: Array<{ role: 'user' | 'assistant'; content: string }>) => {
     setStep('parsing');
@@ -98,18 +97,20 @@ export function SearchWizard() {
   const handleFlightSelect = useCallback(async (selectedFlights: PriceData[]) => {
     if (!parsed) return;
 
+    // Map selected flights back to their routes
     const routesWithFlights = routes.filter((r) => r.flights.length > 0);
-    const currentRoute = routesWithFlights[currentRouteIdx];
-    if (!currentRoute) return;
+    const selections: Array<{ route: RouteResult; flights: PriceData[] }> = [];
 
-    const selections = [{ route: currentRoute, flights: selectedFlights }];
-
-    // If there are more routes, we could cycle through them.
-    // For now, track the current route's selections.
-    if (currentRouteIdx < routesWithFlights.length - 1) {
-      setCurrentRouteIdx((i) => i + 1);
-      return;
+    for (const route of routesWithFlights) {
+      const routeFlights = selectedFlights.filter((f) =>
+        route.flights.some((rf) => rf.airline === f.airline && rf.price === f.price && rf.travelDate === f.travelDate)
+      );
+      if (routeFlights.length > 0) {
+        selections.push({ route, flights: routeFlights });
+      }
     }
+
+    if (selections.length === 0) return;
 
     setStep('tracking');
     try {
@@ -120,7 +121,7 @@ export function SearchWizard() {
       setError(err instanceof Error ? err.message : 'Failed to create tracker');
       setStep('input');
     }
-  }, [parsed, routes, currentRouteIdx, rawInput]);
+  }, [parsed, routes, rawInput]);
 
   return (
     <Box flexDirection="column">
@@ -212,21 +213,21 @@ export function SearchWizard() {
 
       {step === 'select' && (() => {
         const routesWithFlights = routes.filter((r) => r.flights.length > 0);
-        const route = routesWithFlights[currentRouteIdx];
-        if (!route) return null;
+        const allFlights = routesWithFlights.flatMap((r) => r.flights);
+        if (allFlights.length === 0) return null;
         return (
           <Box flexDirection="column">
-            <Box marginBottom={1}>
-              <Text bold color="white">{route.originName}</Text>
-              <Text dimColor> → </Text>
-              <Text bold color="white">{route.destinationName}</Text>
-              {route.date && <Text dimColor> ({route.date})</Text>}
-              {routesWithFlights.length > 1 && (
-                <Text dimColor> [{currentRouteIdx + 1}/{routesWithFlights.length}]</Text>
-              )}
-            </Box>
+            {routesWithFlights.map((route) => (
+              <Box key={`${route.origin}-${route.destination}-${route.date}`} marginBottom={0}>
+                <Text bold color="white">{route.originName}</Text>
+                <Text dimColor> → </Text>
+                <Text bold color="white">{route.destinationName}</Text>
+                {route.date && <Text dimColor> ({route.date})</Text>}
+                <Text dimColor>  {route.flights.length} flights</Text>
+              </Box>
+            ))}
             <FlightTable
-              flights={route.flights}
+              flights={allFlights}
               currency={parsed?.currency ?? 'USD'}
               onConfirm={handleFlightSelect}
               onBack={() => setStep('confirm')}

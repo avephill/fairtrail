@@ -75,7 +75,7 @@ export async function launchTmuxView(queryId: string): Promise<void> {
     });
   }
 
-  console.log(`Found ${queries.length} route(s) — opening tmux panes...`);
+  console.log(`Found ${queries.length} route(s)...`);
   for (const q of queries) {
     console.log(`  ${q.origin} → ${q.destination}  (${q.dateFrom.toISOString().slice(0, 10)})`);
   }
@@ -88,14 +88,20 @@ export async function launchTmuxView(queryId: string): Promise<void> {
     const target = `${session}:${win}.${pane}`;
 
     // First command runs in the current pane
-    const firstCmd = buildViewCommand(queries[0]!.id);
+    const q0 = queries[0]!;
+    const firstCmd = buildViewCommand(q0.id);
+    const title0 = `${q0.origin}→${q0.destination} ${q0.dateFrom.toISOString().slice(0, 10)}`;
+    tmux('select-pane', '-t', target, '-T', title0);
     tmux('send-keys', '-t', target, firstCmd, 'Enter');
 
     // Split for remaining queries
     for (let i = 1; i < queries.length; i++) {
-      const cmd = buildViewCommand(queries[i]!.id);
+      const q = queries[i]!;
+      const cmd = buildViewCommand(q.id);
+      const title = `${q.origin}→${q.destination} ${q.dateFrom.toISOString().slice(0, 10)}`;
       const splitDir = i % 2 === 1 ? '-h' : '-v';
       tmux('split-window', splitDir, '-t', target);
+      tmux('select-pane', '-T', title);
       tmux('send-keys', cmd, 'Enter');
     }
 
@@ -107,13 +113,19 @@ export async function launchTmuxView(queryId: string): Promise<void> {
 
     tmux('new-session', '-d', '-s', SESSION_NAME, '-x', '220', '-y', '55');
 
-    const firstCmd = buildViewCommand(queries[0]!.id);
+    const q0 = queries[0]!;
+    const firstCmd = buildViewCommand(q0.id);
+    const title0 = `${q0.origin}→${q0.destination} ${q0.dateFrom.toISOString().slice(0, 10)}`;
+    tmux('select-pane', '-t', `${SESSION_NAME}:0.0`, '-T', title0);
     tmux('send-keys', '-t', `${SESSION_NAME}:0.0`, firstCmd, 'Enter');
 
     for (let i = 1; i < queries.length; i++) {
-      const cmd = buildViewCommand(queries[i]!.id);
+      const q = queries[i]!;
+      const cmd = buildViewCommand(q.id);
+      const title = `${q.origin}→${q.destination} ${q.dateFrom.toISOString().slice(0, 10)}`;
       const splitDir = i % 2 === 1 ? '-h' : '-v';
       tmux('split-window', splitDir, '-t', `${SESSION_NAME}:0`);
+      tmux('select-pane', '-T', title);
       tmux('send-keys', '-t', `${SESSION_NAME}:0.${i}`, cmd, 'Enter');
     }
 

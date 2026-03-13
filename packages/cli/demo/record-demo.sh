@@ -11,7 +11,7 @@ SESSION="ft-rec"
 DEMO_DIR="$(pwd)/packages/cli/demo"
 
 Q1="Frankfurt to Bogota and Medellin, Dec 5 to Dec 15, round trip, max 1 stop"
-Q2="Frankfurt to Cartagena and Lima, Dec 5 to Dec 15, round trip, max 1 stop"
+Q2="Frankfurt to Cartagena and Lima, Dec 5 to Dec 15, round trip, max 2 stops"
 
 type_slow() {
   local pane=$1 text=$2
@@ -28,11 +28,14 @@ kill_ink() {
 
 start_recording() {
   local out=$1
+  # Bring Ghostty to front and get its window ID
+  osascript -e 'tell application "Ghostty" to activate' 2>/dev/null || true
+  sleep 1
   WID=$(/tmp/get_window_id ghostty 2>/dev/null)
   screencapture -v -x -l "$WID" "$out" &
   REC_PID=$!
   sleep 1
-  echo "Recording → $out (PID=$REC_PID)"
+  echo "Recording → $out (PID=$REC_PID, WID=$WID)"
 }
 
 stop_recording() {
