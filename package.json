@@ -11,7 +11,7 @@
     "lint": "npm run lint --workspace=@fairtrail/web && npm run lint --workspace=@fairtrail/cli",
     "typecheck": "npm run typecheck --workspace=@fairtrail/web && npm run typecheck --workspace=@fairtrail/cli",
     "test": "npm run test --workspace=@fairtrail/web",
-    "cli": "doppler run -- node --import tsx/esm --import ./packages/cli/register.mjs packages/cli/src/index.tsx",
+    "cli": "doppler run -- node --import tsx/esm --import ./packages/cli/register.mjs packages/cli/src/index.tsx --headless",
     "cli:dev": "npm run dev --workspace=@fairtrail/cli",
     "ci": "npm run lint && npm run typecheck && npm run test && npm run build",
     "db:push": "npx prisma db push --schema=apps/web/prisma/schema.prisma",

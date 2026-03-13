@@ -2,11 +2,13 @@ import { execSync, spawnSync, spawn } from 'child_process';
 import { prisma } from '@/lib/prisma';
 
 const SESSION_NAME = 'fairtrail-view';
-const WINDOW_NAME = 'fairtrail';
 
 function tmux(...args: string[]): string {
   const result = spawnSync('tmux', args, { encoding: 'utf-8' });
   if (result.error) throw result.error;
+  if (result.status !== 0 && result.stderr) {
+    throw new Error(result.stderr.trim());
+  }
   return result.stdout.trim();
 }
 
@@ -28,28 +30,9 @@ function hasGhostty(): boolean {
   }
 }
 
-function currentSession(): string {
-  return tmux('display-message', '-p', '#{session_name}');
-}
-
 function buildViewCommand(queryId: string): string {
   const cwd = process.cwd();
   return `cd ${cwd} && doppler run -- node --import tsx/esm --import ./packages/cli/register.mjs packages/cli/src/index.tsx --view ${queryId}`;
-}
-
-function createTmuxPanes(session: string, window: string, queries: Array<{ id: string; origin: string; destination: string; dateFrom: Date }>) {
-  const firstCmd = buildViewCommand(queries[0]!.id);
-  tmux('send-keys', '-t', `${session}:${window}`, firstCmd, 'Enter');
-
-  for (let i = 1; i < queries.length; i++) {
-    const cmd = buildViewCommand(queries[i]!.id);
-    const splitDir = i % 2 === 1 ? '-h' : '-v';
-    tmux('split-window', splitDir, '-t', `${session}:${window}`);
-    tmux('send-keys', '-t', `${session}:${window}`, cmd, 'Enter');
-  }
-
-  tmux('select-layout', '-t', `${session}:${window}`, 'tiled');
-  tmux('select-pane', '-t', `${session}:${window}.0`);
 }
 
 export async function launchTmuxView(queryId: string): Promise<void> {
@@ -72,36 +55,41 @@ export async function launchTmuxView(queryId: string): Promise<void> {
     });
   }
 
-  console.log(`Found ${queries.length} route(s) — opening tmux panes...`);
+  console.log(`Found ${queries.length} route(s) — creating isolated tmux session...`);
   for (const q of queries) {
     console.log(`  ${q.origin} → ${q.destination}  (${q.dateFrom.toISOString().slice(0, 10)})`);
   }
 
-  if (process.env.TMUX) {
-    // Inside tmux — create a new window in the current session
-    const session = currentSession();
-    tmux('new-window', '-t', `${session}:`, '-n', WINDOW_NAME);
-    createTmuxPanes(session, WINDOW_NAME, queries);
-    tmux('select-window', '-t', `${session}:${WINDOW_NAME}`);
-    console.log(`Opened ${queries.length} panes in tmux window "${WINDOW_NAME}"`);
+  // Always create a NEW isolated session — never touch the user's current tmux
+  try { tmux('kill-session', '-t', SESSION_NAME); } catch { /* ok if not found */ }
+
+  tmux('new-session', '-d', '-s', SESSION_NAME, '-x', '220', '-y', '55');
+
+  // First pane already exists from new-session — send the first view command
+  const firstCmd = buildViewCommand(queries[0]!.id);
+  tmux('send-keys', '-t', `${SESSION_NAME}:0.0`, firstCmd, 'Enter');
+
+  // Split for remaining queries
+  for (let i = 1; i < queries.length; i++) {
+    const cmd = buildViewCommand(queries[i]!.id);
+    const splitDir = i % 2 === 1 ? '-h' : '-v';
+    tmux('split-window', splitDir, '-t', `${SESSION_NAME}:0`);
+    tmux('send-keys', '-t', `${SESSION_NAME}:0.${i}`, cmd, 'Enter');
+  }
+
+  tmux('select-layout', '-t', `${SESSION_NAME}:0`, 'tiled');
+  tmux('select-pane', '-t', `${SESSION_NAME}:0.0`);
+
+  // Open in a new Ghostty window (or attach in current terminal as fallback)
+  if (hasGhostty()) {
+    spawn('ghostty', ['-e', 'tmux', 'attach-session', '-t', SESSION_NAME], {
+      detached: true,
+      stdio: 'ignore',
+    }).unref();
+    console.log(`Opened new Ghostty window with ${queries.length} panes`);
   } else {
-    // Outside tmux — create a new detached session, then open in Ghostty or attach
-    try { tmux('kill-session', '-t', SESSION_NAME); } catch { /* ok */ }
-
-    tmux('new-session', '-d', '-s', SESSION_NAME, '-x', '220', '-y', '55');
-    createTmuxPanes(SESSION_NAME, '0', queries);
-
-    if (hasGhostty()) {
-      // Open a new Ghostty window attached to the tmux session
-      spawn('ghostty', ['-e', `tmux attach-session -t ${SESSION_NAME}`], {
-        detached: true,
-        stdio: 'ignore',
-      }).unref();
-      console.log(`Opened Ghostty window with ${queries.length} panes`);
-    } else {
-      // Attach in current terminal
-      spawnSync('tmux', ['attach-session', '-t', SESSION_NAME], { stdio: 'inherit' });
-    }
+    console.log(`Attaching to tmux session "${SESSION_NAME}"...`);
+    spawnSync('tmux', ['attach-session', '-t', SESSION_NAME], { stdio: 'inherit' });
   }
 
   await prisma.$disconnect();

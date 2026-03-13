@@ -1,5 +1,5 @@
-import React from 'react';
-import { Box, Text } from 'ink';
+import React, { useState, useEffect } from 'react';
+import { Box, Text, useStdout } from 'ink';
 import { renderBrailleChart, type ChartSeries } from '../lib/chart.js';
 import { currencySymbol, formatDateShort } from '../lib/format.js';
 
@@ -13,20 +13,44 @@ interface Snapshot {
 interface PriceChartProps {
   snapshots: Snapshot[];
   currency: string;
-  width?: number;
-  height?: number;
 }
 
-export function PriceChart({ snapshots, currency, width, height }: PriceChartProps) {
-  const termWidth = width ?? Math.min(process.stdout.columns || 80, 120);
-  const termHeight = height ?? Math.max(8, Math.min(Math.floor((process.stdout.rows || 24) * 0.4), 18));
+export function PriceChart({ snapshots, currency }: PriceChartProps) {
+  const { stdout } = useStdout();
+  const [dims, setDims] = useState({ cols: stdout.columns || 80, rows: stdout.rows || 24 });
+
+  useEffect(() => {
+    const onResize = () => {
+      setDims({ cols: stdout.columns || 80, rows: stdout.rows || 24 });
+    };
+    stdout.on('resize', onResize);
+    // Pick up initial size (tmux pane may differ from process.stdout)
+    onResize();
+    return () => { stdout.off('resize', onResize); };
+  }, [stdout]);
+
+  const chartWidth = Math.min(dims.cols - 2, 140);
+  const chartHeight = Math.max(6, Math.min(Math.floor(dims.rows * 0.35), 16));
+
   if (snapshots.length === 0) {
     return <Text dimColor>No price data yet — waiting for first scrape.</Text>;
   }
 
-  // Group by airline
+  // Determine visible time window: cap at maxPoints scrape sessions
+  // so the chart doesn't get crammed as data accumulates
+  const maxPoints = Math.max(10, Math.floor(chartWidth / 4));
+  const scrapeTimesSet = new Set(snapshots.map((s) => s.scrapedAt.getTime()));
+  const scrapeTimes = [...scrapeTimesSet].sort((a, b) => a - b);
+  const cutoffTime = scrapeTimes.length > maxPoints
+    ? scrapeTimes[scrapeTimes.length - maxPoints]!
+    : 0;
+
+  const visible = cutoffTime > 0
+    ? snapshots.filter((s) => s.scrapedAt.getTime() >= cutoffTime)
+    : snapshots;
+
   const byAirline = new Map<string, Array<{ x: number; y: number }>>();
-  for (const s of snapshots) {
+  for (const s of visible) {
     const t = s.scrapedAt.getTime();
     if (!byAirline.has(s.airline)) byAirline.set(s.airline, []);
     byAirline.get(s.airline)!.push({ x: t, y: s.price });
@@ -37,11 +61,10 @@ export function PriceChart({ snapshots, currency, width, height }: PriceChartPro
     series.push({ label: airline, points });
   }
 
-  // X-axis labels: spread across the date range
-  const allTimes = snapshots.map((s) => s.scrapedAt.getTime());
+  const allTimes = visible.map((s) => s.scrapedAt.getTime());
   const minT = Math.min(...allTimes);
   const maxT = Math.max(...allTimes);
-  const labelCount = Math.min(5, snapshots.length);
+  const labelCount = Math.min(5, scrapeTimesSet.size);
   const xLabels: string[] = [];
   for (let i = 0; i < labelCount; i++) {
     const t = minT + (i / (labelCount - 1 || 1)) * (maxT - minT);
@@ -49,8 +72,8 @@ export function PriceChart({ snapshots, currency, width, height }: PriceChartPro
   }
 
   const chart = renderBrailleChart(series, {
-    width: termWidth,
-    height: termHeight,
+    width: chartWidth,
+    height: chartHeight,
     yLabel: currencySymbol(currency),
     xLabels,
   });
