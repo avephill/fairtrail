@@ -86,13 +86,13 @@ Fairtrail needs an LLM for two things: parsing natural language queries and extr
 
 | Provider | Env Var | Cost | Notes |
 |----------|---------|------|-------|
-| **Claude Code** | `CLAUDE_CODE_ENABLED=true` | Free (Pro/Max plan) | Auto-detected by `setup.sh` |
-| **Codex CLI** | `CODEX_ENABLED=true` | Free (ChatGPT Pro) | Auto-detected by `setup.sh` |
+| **Claude Code** | Auto-detected | Free (Pro/Max plan) | Mounts `~/.claude` into the container |
+| **Codex CLI** | Auto-detected | Free (ChatGPT Pro) | Mounts `~/.codex` into the container |
 | **Anthropic** | `ANTHROPIC_API_KEY` | ~$0.001/query | Claude Haiku 4.5 (default) |
 | **OpenAI** | `OPENAI_API_KEY` | ~$0.0004/query | GPT-4.1 Mini |
 | **Google** | `GOOGLE_AI_API_KEY` | ~$0.00015/query | Gemini 2.5 Flash (cheapest) |
 
-CLI providers are listed first because they cost nothing extra if you already have a subscription. The setup script handles everything automatically.
+CLI providers are listed first because they cost nothing extra if you already have a subscription. The installer detects them automatically and mounts their auth into the Docker container.
 
 ## Configuration
 
