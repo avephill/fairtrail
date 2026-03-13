@@ -105,8 +105,8 @@ export function renderBrailleChart(
       if (i > 0) {
         const [px, py] = pts[i - 1]!;
         // Bresenham's line
-        let dx = Math.abs(x0 - px);
-        let dy = -Math.abs(y0 - py);
+        const dx = Math.abs(x0 - px);
+        const dy = -Math.abs(y0 - py);
         const sx = px < x0 ? 1 : -1;
         const sy = py < y0 ? 1 : -1;
         let err = dx + dy;
