@@ -5,11 +5,17 @@ import type { ChildProcess } from 'child_process';
 // Mock child_process — vi.mock handles both static and dynamic imports
 const mockSpawn = vi.fn();
 const mockExecSync = vi.fn();
+const mockExistsSync = vi.fn();
 
 vi.mock('child_process', () => ({
   spawn: (...args: unknown[]) => mockSpawn(...args),
   execSync: (...args: unknown[]) => mockExecSync(...args),
 }));
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return { ...actual, existsSync: (...args: unknown[]) => mockExistsSync(...args) };
+});
 
 // Must import after mocks
 const { EXTRACTION_PROVIDERS, detectAvailableProviders, filterCliStderr } = await import(
@@ -63,8 +69,9 @@ describe('ai-registry', () => {
       expect(providers).not.toContain('google');
     });
 
-    it('auto-detects CLI providers when binary exists', async () => {
+    it('auto-detects CLI providers when binary and auth exist', async () => {
       mockExecSync.mockReturnValue(Buffer.from('/usr/local/bin/claude'));
+      mockExistsSync.mockReturnValue(true);
 
       const providers = await detectAvailableProviders();
 
@@ -72,6 +79,26 @@ describe('ai-registry', () => {
       expect(mockExecSync).toHaveBeenCalledWith('which claude', {
         stdio: 'ignore',
       });
+    });
+
+    it('skips CLI providers when binary exists but no auth', async () => {
+      mockExecSync.mockReturnValue(Buffer.from('/usr/local/bin/codex'));
+      mockExistsSync.mockReturnValue(false);
+
+      const providers = await detectAvailableProviders();
+
+      expect(providers).not.toContain('codex');
+      expect(providers).not.toContain('claude-code');
+    });
+
+    it('detects codex when binary exists and OPENAI_API_KEY is set (no auth.json)', async () => {
+      process.env.OPENAI_API_KEY = 'sk-test';
+      mockExecSync.mockReturnValue(Buffer.from('/usr/local/bin/codex'));
+      mockExistsSync.mockReturnValue(false);
+
+      const providers = await detectAvailableProviders();
+
+      expect(providers).toContain('codex');
     });
 
     it('skips CLI providers when binary is not found', async () => {

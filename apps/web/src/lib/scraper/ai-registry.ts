@@ -270,6 +270,25 @@ export const CLI_PROVIDERS: Record<string, string> = {
   codex: 'codex',
 };
 
+/** Check that a CLI provider has auth configured, not just the binary installed */
+async function hasCliAuth(provider: string): Promise<boolean> {
+  const { existsSync } = await import(/* webpackIgnore: true */ 'fs');
+  const { homedir } = await import(/* webpackIgnore: true */ 'os');
+  const { join } = await import(/* webpackIgnore: true */ 'path');
+  const home = homedir();
+
+  switch (provider) {
+    case 'codex':
+      return existsSync(join(home, '.codex', 'auth.json'))
+        || !!process.env.OPENAI_API_KEY;
+    case 'claude-code':
+      return existsSync(join(home, '.claude.json'))
+        || existsSync(join(home, '.claude', 'credentials.json'));
+    default:
+      return false;
+  }
+}
+
 export async function detectAvailableProviders(): Promise<string[]> {
   const available: string[] = [];
 
@@ -279,7 +298,9 @@ export async function detectAvailableProviders(): Promise<string[]> {
       try {
         const { execSync } = await import('child_process');
         execSync(`which ${cliBinary}`, { stdio: 'ignore' });
-        available.push(key);
+        if (await hasCliAuth(key)) {
+          available.push(key);
+        }
       } catch {
         // CLI not found
       }
