@@ -85,20 +85,26 @@ Fairtrail exists because the data is useful to *you* — just not to the compani
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (free with Claude Pro/Max) — auto-detected
   - [Codex](https://github.com/openai/codex) (free with ChatGPT Pro) — auto-detected
   - An API key from Anthropic, OpenAI, or Google
+  - A local model via `OPENAI_BASE_URL` (Ollama, llama.cpp, vLLM — no API key needed)
 
 ## LLM Providers
 
 Fairtrail needs an LLM for two things: parsing natural language queries and extracting price data from Google Flights pages. Pick **any one** of these:
 
-| Provider | Env Var | Cost | Notes |
-|----------|---------|------|-------|
-| **Claude Code** | Auto-detected | Free (Pro/Max plan) | Mounts `~/.claude` into the container |
-| **Codex CLI** | Auto-detected | Free (ChatGPT Pro) | Mounts `~/.codex` into the container |
+| Provider | Auth | Cost | Notes |
+|----------|------|------|-------|
+| **Claude Code** | Auto-detected (host `~/.claude`) | Free (Pro/Max plan) | Subscription CLI — mounts auth read-only |
+| **Codex CLI** | Auto-detected (host `~/.codex`) | Free (ChatGPT Pro) | Subscription CLI — mounts auth read-only |
 | **Anthropic** | `ANTHROPIC_API_KEY` | ~$0.001/query | Claude Haiku 4.5 (default) |
 | **OpenAI** | `OPENAI_API_KEY` | ~$0.0004/query | GPT-4.1 Mini |
 | **Google** | `GOOGLE_AI_API_KEY` | ~$0.00015/query | Gemini 2.5 Flash (cheapest) |
+| **Local model** | `OPENAI_BASE_URL` only | Free | Ollama, llama.cpp, vLLM — no API key needed |
 
-CLI providers are listed first because they cost nothing extra if you already have a subscription. The installer detects them automatically and mounts their config directories (`~/.claude`, `~/.codex`) **read-only** into the Docker container — this gives the containerized CLIs access to your existing auth tokens so they can make API calls on your behalf. Your credentials are never copied, and the container cannot modify them.
+**Three ways to use Fairtrail:**
+
+- **Subscription users** (Claude Pro/Max, ChatGPT Pro) — the installer detects `claude` or `codex` on your machine and mounts their config dirs read-only into the container. Your auth tokens are never copied; the container cannot modify them.
+- **API key users** — paste an Anthropic, OpenAI, or Google key. Passed via env var, never written to disk.
+- **Local model users** — set `OPENAI_BASE_URL` to your local endpoint (e.g. `http://localhost:11434/v1` for Ollama). No API key required — type any model ID in the admin config.
 
 ## Configuration
 
