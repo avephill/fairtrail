@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import commander from 'commander';
-const { program } = commander;
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { program } = require('commander');
 import { render } from 'ink';
 import React from 'react';
 import { App } from './app.js';
