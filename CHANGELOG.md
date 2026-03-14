@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.1] - 2026-03-14
+
+### Added
+- `--backend` and `--model` CLI flags to select AI provider per session
+- Multi-destination parsing: "Bogota or Medellin" creates separate route searches
+- CLI demo GIF and Headless CLI section in README
+
+### Fixed
+- Multi-route flight selection now tracks all routes (via `_routeIdx` tagging)
+- `--tmux` inside tmux splits into new panes instead of sending to own running pane
+- `--tmux` works with single-route queries (no split, just view)
+- Chart flicker eliminated by memoizing expensive renders (countdown ticks don't redraw chart)
+- CLI providers (claude-code, codex) no longer require API key env vars
+- Commander import fixed for Linux CI typecheck
+- Docker PORT env var no longer leaks into container
+
 ## [0.3.0] - 2026-03-13
 
 ### Added
