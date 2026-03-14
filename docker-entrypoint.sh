@@ -71,8 +71,25 @@ if [ -f /home/node/.claude-host.json ]; then
   echo "[setup] Copied Claude credentials file from host"
 fi
 if [ -d /home/node/.codex-host ] && [ "$(ls -A /home/node/.codex-host 2>/dev/null)" ]; then
-  cp -r /home/node/.codex-host/. /home/node/.codex/ 2>/dev/null || true
-  echo "[setup] Copied Codex auth from host"
+  if cp -r /home/node/.codex-host/. /home/node/.codex/ 2>/dev/null; then
+    echo "[setup] Copied Codex auth from host"
+  else
+    echo "[setup] WARNING: Could not copy Codex auth — host files may not be readable"
+    echo "[setup]   Fix: run 'chmod -R a+rX ~/.codex' on the host, then restart"
+  fi
+fi
+
+# Fallback: generate codex auth from OPENAI_API_KEY if no auth.json exists
+if [ -n "$OPENAI_API_KEY" ] && [ ! -f /home/node/.codex/auth.json ]; then
+  node -e "
+    const fs = require('fs');
+    fs.writeFileSync('/home/node/.codex/auth.json', JSON.stringify({
+      auth_mode: 'api_key',
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+      tokens: null
+    }));
+  "
+  echo "[setup] Generated Codex auth from OPENAI_API_KEY"
 fi
 
 # --- Install CLI providers (cached in cli-cache volume) ---

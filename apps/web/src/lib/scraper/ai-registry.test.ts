@@ -12,7 +12,7 @@ vi.mock('child_process', () => ({
 }));
 
 // Must import after mocks
-const { EXTRACTION_PROVIDERS, detectAvailableProviders } = await import(
+const { EXTRACTION_PROVIDERS, detectAvailableProviders, filterCliStderr } = await import(
   './ai-registry'
 );
 
@@ -156,6 +156,69 @@ describe('ai-registry', () => {
       await expect(extractPromise).rejects.toThrow(
         /claude CLI not found.*Restart the container/
       );
+    });
+  });
+
+  describe('filterCliStderr', () => {
+    it('strips PATH warning lines from stderr', () => {
+      const stderr = 'could not update PATH\nError: something went wrong\ncould not update PATH to include /usr/bin';
+      expect(filterCliStderr(stderr)).toBe('Error: something went wrong');
+    });
+
+    it('returns empty string when all lines are PATH warnings', () => {
+      expect(filterCliStderr('could not update PATH')).toBe('');
+    });
+
+    it('preserves non-warning lines unchanged', () => {
+      expect(filterCliStderr('real error message')).toBe('real error message');
+    });
+  });
+
+  describe('codex extract — 401 auth hint', () => {
+    it('includes auth hint when stderr contains 401', async () => {
+      const fakeProc = createFakeProc();
+      mockSpawn.mockReturnValue(fakeProc);
+
+      const extractPromise = EXTRACTION_PROVIDERS.codex!.extract(
+        '',
+        'codex',
+        'system',
+        'user'
+      );
+
+      await vi.waitFor(() => {
+        expect(mockSpawn).toHaveBeenCalled();
+      });
+
+      // Emit 401 on stderr, then close with error
+      fakeProc.stderr!.emit('data', Buffer.from('401 Unauthorized'));
+      fakeProc.emit('close', 1);
+
+      await expect(extractPromise).rejects.toThrow(
+        /ensure codex is authenticated on the host via `codex auth`/
+      );
+    });
+
+    it('does not include auth hint for non-401 errors', async () => {
+      const fakeProc = createFakeProc();
+      mockSpawn.mockReturnValue(fakeProc);
+
+      const extractPromise = EXTRACTION_PROVIDERS.codex!.extract(
+        '',
+        'codex',
+        'system',
+        'user'
+      );
+
+      await vi.waitFor(() => {
+        expect(mockSpawn).toHaveBeenCalled();
+      });
+
+      fakeProc.stderr!.emit('data', Buffer.from('some other error'));
+      fakeProc.emit('close', 1);
+
+      await expect(extractPromise).rejects.toThrow('codex CLI exited 1: some other error');
+      await expect(extractPromise).rejects.not.toThrow(/codex auth/);
     });
   });
 

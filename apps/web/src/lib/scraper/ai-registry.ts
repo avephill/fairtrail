@@ -30,6 +30,15 @@ interface ProviderConfig {
   ) => Promise<ExtractionResult>;
 }
 
+/** Strip benign CLI warnings (e.g. PATH update failures) from stderr */
+export function filterCliStderr(stderr: string): string {
+  return stderr
+    .split('\n')
+    .filter(line => !line.includes('could not update PATH'))
+    .join('\n')
+    .trim();
+}
+
 export const EXTRACTION_PROVIDERS: Record<string, ProviderConfig> = {
   anthropic: {
     displayName: 'Anthropic',
@@ -167,8 +176,12 @@ export const EXTRACTION_PROVIDERS: Record<string, ProviderConfig> = {
           stderr += d.toString();
         });
         proc.on('close', (code) => {
-          if (code !== 0) reject(new Error(`claude CLI exited ${code}: ${stderr}`));
-          else resolve(stdout.trim());
+          if (code !== 0) {
+            const filtered = filterCliStderr(stderr);
+            reject(new Error(`claude CLI exited ${code}: ${filtered}`));
+          } else {
+            resolve(stdout.trim());
+          }
         });
         proc.on('error', (err: NodeJS.ErrnoException) => {
           if (err.code === 'ENOENT') {
@@ -220,13 +233,17 @@ export const EXTRACTION_PROVIDERS: Record<string, ProviderConfig> = {
           stderr += d.toString();
         });
         proc.on('close', (code) => {
+          const filtered = filterCliStderr(stderr);
+          const hint = filtered.includes('401') || filtered.includes('Unauthorized')
+            ? ' (ensure codex is authenticated on the host via `codex auth` and ~/.codex is readable)'
+            : '';
           try {
             const output = readFileSync(tmpFile, 'utf-8').trim();
             unlinkSync(tmpFile);
-            if (code !== 0) reject(new Error(`codex CLI exited ${code}: ${stderr}`));
+            if (code !== 0) reject(new Error(`codex CLI exited ${code}: ${filtered}${hint}`));
             else resolve(output);
           } catch {
-            reject(new Error(`codex CLI exited ${code}: ${stderr}`));
+            reject(new Error(`codex CLI exited ${code}: ${filtered}${hint}`));
           }
         });
         proc.on('error', (err: NodeJS.ErrnoException) => {
