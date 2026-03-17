@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.5] - 2026-03-17
+
+### Added
+- First-class Ollama and llama.cpp providers — select from the admin UI dropdown, type your model ID, and optionally set a custom base URL. No env vars needed ([#8](https://github.com/affromero/fairtrail/issues/8), thanks [@johenkel](https://github.com/johenkel))
+- DB-persisted `customBaseUrl` field on ExtractionConfig — configure LLM endpoints from the admin UI instead of requiring server-side env vars
+- Base URL input in admin config, settings, and setup pages with auto-populated defaults per provider
+
+### Fixed
+- Installer and CLI now support both `docker compose` (v2 plugin) and `docker-compose` (v1 standalone) — fixes install failure on Docker 20.x systems ([#8](https://github.com/affromero/fairtrail/issues/8), thanks [@johenkel](https://github.com/johenkel))
+
 ## [0.3.4] - 2026-03-16
 
 ### Fixed
