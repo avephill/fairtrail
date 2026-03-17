@@ -136,7 +136,7 @@ export default async function HomePage() {
                 <h3 className={styles.reasonTitle}>Install in one command</h3>
                 <p className={styles.reasonText}>
                   The setup script auto-detects Claude Code or Codex on your machine.
-                  If you have either, no API key needed. Or run a local model with Ollama or llama.cpp &mdash; completely free.
+                  If you have either, no API key needed. Or run a local model with Ollama, llama.cpp, or vLLM &mdash; completely free.
                 </p>
               </div>
             </div>
@@ -188,7 +188,7 @@ export default async function HomePage() {
                 <h3 className={styles.reasonTitle}>Not an AI provider</h3>
                 <p className={styles.reasonText}>
                   AI is becoming a commodity &mdash; we don&apos;t bundle or resell it.
-                  Bring your own key, use Claude Code / Codex, or run Ollama / llama.cpp locally.
+                  Bring your own key, use Claude Code / Codex, or run Ollama / llama.cpp / vLLM locally.
                 </p>
               </div>
             </div>
@@ -247,7 +247,7 @@ export default async function HomePage() {
               <div>
                 <h3 className={styles.reasonTitle}>Free with Claude Code, Codex, or a local model</h3>
                 <p className={styles.reasonText}>
-                  Use your existing CLI subscription, or run Ollama / llama.cpp locally &mdash; zero API cost.
+                  Use your existing CLI subscription, or run Ollama / llama.cpp / vLLM locally &mdash; zero API cost.
                   Otherwise, extraction costs under $0.001 per query.
                 </p>
               </div>

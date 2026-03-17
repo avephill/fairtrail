@@ -120,10 +120,11 @@ describe('ai-registry', () => {
   });
 
   describe('allowCustomModel', () => {
-    it('is enabled for openai, ollama, and llamacpp providers', () => {
+    it('is enabled for openai, ollama, llamacpp, and vllm providers', () => {
       expect(EXTRACTION_PROVIDERS.openai!.allowCustomModel).toBe(true);
       expect(EXTRACTION_PROVIDERS.ollama!.allowCustomModel).toBe(true);
       expect(EXTRACTION_PROVIDERS.llamacpp!.allowCustomModel).toBe(true);
+      expect(EXTRACTION_PROVIDERS.vllm!.allowCustomModel).toBe(true);
     });
 
     it('is not enabled for other providers', () => {
@@ -155,9 +156,19 @@ describe('ai-registry', () => {
       expect(EXTRACTION_PROVIDERS.openai!.allowCustomBaseUrl).toBe(true);
     });
 
-    it('LOCAL_PROVIDERS includes ollama and llamacpp', () => {
+    it('vllm provider exists with correct config', () => {
+      const vllm = EXTRACTION_PROVIDERS.vllm!;
+      expect(vllm.displayName).toBe('vLLM');
+      expect(vllm.allowCustomBaseUrl).toBe(true);
+      expect(vllm.defaultBaseUrl).toBe('http://localhost:8000/v1');
+      expect(vllm.models).toHaveLength(0);
+      expect(vllm.envKey).toBeUndefined();
+    });
+
+    it('LOCAL_PROVIDERS includes ollama, llamacpp, and vllm', () => {
       expect(LOCAL_PROVIDERS.has('ollama')).toBe(true);
       expect(LOCAL_PROVIDERS.has('llamacpp')).toBe(true);
+      expect(LOCAL_PROVIDERS.has('vllm')).toBe(true);
       expect(LOCAL_PROVIDERS.has('openai')).toBe(false);
     });
   });

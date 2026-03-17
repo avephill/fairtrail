@@ -183,6 +183,35 @@ export const EXTRACTION_PROVIDERS: Record<string, ProviderConfig> = {
       };
     },
   },
+  vllm: {
+    displayName: 'vLLM',
+    envKey: undefined,
+    allowCustomModel: true,
+    allowCustomBaseUrl: true,
+    defaultBaseUrl: 'http://localhost:8000/v1',
+    models: [],
+    extract: async (_apiKey, model, systemPrompt, userPrompt, options) => {
+      const { default: OpenAI } = await import('openai');
+      const baseURL = options?.baseUrl || 'http://localhost:8000/v1';
+      const client = new OpenAI({ apiKey: 'unused', baseURL });
+      const response = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        max_tokens: 8192,
+      });
+
+      return {
+        content: response.choices[0]?.message.content ?? '',
+        usage: {
+          inputTokens: response.usage?.prompt_tokens ?? 0,
+          outputTokens: response.usage?.completion_tokens ?? 0,
+        },
+      };
+    },
+  },
   google: {
     displayName: 'Google',
     envKey: 'GOOGLE_AI_API_KEY',
@@ -337,7 +366,7 @@ export const CLI_PROVIDERS: Record<string, string> = {
   codex: 'codex',
 };
 
-export const LOCAL_PROVIDERS = new Set(['ollama', 'llamacpp']);
+export const LOCAL_PROVIDERS = new Set(['ollama', 'llamacpp', 'vllm']);
 
 /** Check that a CLI provider has auth configured, not just the binary installed */
 async function hasCliAuth(provider: string): Promise<boolean> {
