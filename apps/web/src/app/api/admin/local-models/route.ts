@@ -33,11 +33,16 @@ function resolveOllamaHost(customBaseUrl: string | null): string {
   return 'http://localhost:11434';
 }
 
-function resolveLlamacppHost(customBaseUrl: string | null): string {
+const DEFAULT_HOSTS: Record<string, string> = {
+  llamacpp: 'http://localhost:8080',
+  vllm: 'http://localhost:8000',
+};
+
+function resolveOpenAICompatHost(provider: string, customBaseUrl: string | null): string {
   if (customBaseUrl) {
     return customBaseUrl.replace(/\/v1\/?$/, '');
   }
-  return 'http://localhost:8080';
+  return DEFAULT_HOSTS[provider] ?? 'http://localhost:8000';
 }
 
 function formatSize(bytes: number): string {
@@ -60,11 +65,11 @@ async function fetchOllamaModels(host: string): Promise<LocalModel[]> {
   }));
 }
 
-async function fetchLlamacppModels(host: string): Promise<LocalModel[]> {
+async function fetchOpenAICompatModels(provider: string, host: string): Promise<LocalModel[]> {
   const res = await fetch(`${host}/v1/models`, {
     signal: AbortSignal.timeout(5000),
   });
-  if (!res.ok) throw new Error(`llama.cpp returned ${res.status}`);
+  if (!res.ok) throw new Error(`${provider} returned ${res.status}`);
   const data = (await res.json()) as { data: { id: string }[] };
   return (data.data ?? []).map((m) => ({
     id: m.id,
@@ -89,7 +94,7 @@ export async function GET(request: NextRequest) {
 
   const host = provider === 'ollama'
     ? resolveOllamaHost(storedUrl)
-    : resolveLlamacppHost(storedUrl);
+    : resolveOpenAICompatHost(provider, storedUrl);
   const cacheKey = `local-models:${provider}:${host}`;
 
   try {
@@ -97,7 +102,7 @@ export async function GET(request: NextRequest) {
       cacheKey,
       async () => {
         if (provider === 'ollama') return fetchOllamaModels(host);
-        return fetchLlamacppModels(host);
+        return fetchOpenAICompatModels(provider, host);
       },
       300, // 5 min TTL
     );

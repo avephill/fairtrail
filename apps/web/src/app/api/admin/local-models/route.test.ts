@@ -112,6 +112,37 @@ describe('GET /api/admin/local-models', () => {
     expect(body.data[0].id).toBe('my-model');
   });
 
+  it('returns vllm models via /v1/models endpoint', async () => {
+    mockFindFirst.mockResolvedValue({ provider: 'vllm', customBaseUrl: null });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        data: [{ id: 'meta-llama/Llama-3.1-8B-Instruct' }],
+      }),
+    });
+
+    const res = await GET(makeRequest('vllm'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].id).toBe('meta-llama/Llama-3.1-8B-Instruct');
+  });
+
+  it('uses default port 8000 for vllm', async () => {
+    mockFindFirst.mockResolvedValue({ provider: 'vllm', customBaseUrl: null });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [] }),
+    });
+
+    await GET(makeRequest('vllm'));
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://localhost:8000/v1/models',
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+  });
+
   it('uses cached results when available', async () => {
     const cachedModels = [{ id: 'cached-model', name: 'cached-model', size: '8B' }];
     mockCached.mockResolvedValue(cachedModels);
