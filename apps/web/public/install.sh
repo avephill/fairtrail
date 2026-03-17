@@ -137,6 +137,15 @@ fi
 
 ok "Docker is running"
 
+# Detect docker compose command (v2 plugin vs v1 standalone)
+if docker compose version &>/dev/null 2>&1; then
+  DC="docker compose"
+elif command -v docker-compose &>/dev/null; then
+  DC="docker-compose"
+else
+  fail "Neither 'docker compose' (v2) nor 'docker-compose' (v1) found.\n\n  Install Docker Compose: ${BOLD}https://docs.docker.com/compose/install/${RESET}"
+fi
+
 # ---------------------------------------------------------------------------
 # 1b. Check if port is available
 # ---------------------------------------------------------------------------
@@ -438,11 +447,11 @@ echo ""
 
 cd "$FAIRTRAIL_DIR"
 
-docker compose pull 2>&1 | while IFS= read -r line; do
+$DC pull 2>&1 | while IFS= read -r line; do
   printf "  ${DIM}%s${RESET}\n" "$line"
 done
 
-docker compose up -d 2>&1 | while IFS= read -r line; do
+$DC up -d 2>&1 | while IFS= read -r line; do
   printf "  ${DIM}%s${RESET}\n" "$line"
 done
 

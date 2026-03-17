@@ -37,8 +37,18 @@ cd "$FAIRTRAIL_DIR"
 COMPOSE_FILES="-f docker-compose.yml"
 [ -f "docker-compose.override.yml" ] && COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.override.yml"
 
+# Detect docker compose command (v2 plugin vs v1 standalone)
+if docker compose version &>/dev/null 2>&1; then
+  _DC="docker compose"
+elif command -v docker-compose &>/dev/null; then
+  _DC="docker-compose"
+else
+  printf "${RED}${BOLD}✗${RESET} Neither 'docker compose' (v2) nor 'docker-compose' (v1) found.\n"
+  exit 1
+fi
+
 dc() {
-  docker compose $COMPOSE_FILES "$@"
+  $_DC $COMPOSE_FILES "$@"
 }
 
 format_time() {
