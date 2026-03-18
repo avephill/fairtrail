@@ -4,8 +4,9 @@ set -euo pipefail
 # Integration test: builds the app image, starts app+DB+Redis,
 # then hits every critical endpoint with curl.
 #
-# Usage: bash scripts/docker-integration-test.sh [--no-build]
+# Usage: bash scripts/docker-integration-test.sh [--no-build] [--keep-alive]
 # Pass --no-build to skip image build (use existing ghcr image).
+# Pass --keep-alive to skip container cleanup on exit (for chaining with other tests).
 
 BOLD='\033[1m'
 GREEN='\033[0;32m'
@@ -20,6 +21,15 @@ PORT=3399  # Use a non-standard port to avoid conflicts
 pass() { PASS=$((PASS + 1)); printf "${GREEN}PASS${RESET} %s\n" "$1"; }
 fail() { FAIL=$((FAIL + 1)); printf "${RED}FAIL${RESET} %s -- %s\n" "$1" "$2"; }
 
+NO_BUILD=false
+KEEP_ALIVE=false
+for arg in "$@"; do
+  case "$arg" in
+    --no-build)  NO_BUILD=true ;;
+    --keep-alive) KEEP_ALIVE=true ;;
+  esac
+done
+
 PROJECT="fairtrail-integration-test"
 COMPOSE_FILE="scripts/docker-compose.integration.yml"
 
@@ -27,14 +37,16 @@ cleanup() {
   printf "\n${DIM}Cleaning up...${RESET}\n"
   docker compose -p "$PROJECT" -f "$COMPOSE_FILE" down -v --remove-orphans 2>/dev/null || true
 }
-trap cleanup EXIT
+if [ "$KEEP_ALIVE" = false ]; then
+  trap cleanup EXIT
+fi
 
 echo ""
 printf "${BOLD}Fairtrail integration tests${RESET}\n"
 echo ""
 
 # ── Build image (unless --no-build) ──────────────────────────────
-if [[ "${1:-}" != "--no-build" ]]; then
+if [ "$NO_BUILD" = false ]; then
   printf "${DIM}Building app image...${RESET}\n"
   docker build -t fairtrail-test:latest . -q
   printf "${DIM}Build complete.${RESET}\n\n"

@@ -36,12 +36,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t fairtrail-test:latest .
-      - run: bash scripts/docker-integration-test.sh --no-build
+      - run: bash scripts/docker-integration-test.sh --no-build --keep-alive
       - name: Browser smoke tests
         run: |
           npm ci
           npx playwright install chromium --with-deps
           bash scripts/browser-smoke-test.sh http://localhost:3399
+      - name: Cleanup containers
+        if: always()
+        run: docker compose -p fairtrail-integration-test -f scripts/docker-compose.integration.yml down -v --remove-orphans
 
   staging:
     runs-on: ubuntu-latest
