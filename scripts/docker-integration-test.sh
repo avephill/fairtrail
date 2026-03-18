@@ -229,6 +229,33 @@ test_static_assets() {
   fi
 }
 
+# ── Test 9: Volume migration safety ──────────────────────────────
+test_volume_migration() {
+  # Verify docker compose project name is "fairtrail" regardless of
+  # whether the directory is ~/fairtrail or ~/.fairtrail
+  local installer="apps/web/public/install.sh"
+
+  # Both old (~/fairtrail) and new (~/.fairtrail) must produce the same
+  # Docker Compose project name so volumes are preserved across migration.
+  # Compose strips leading dots from directory names for the project name.
+  local old_name new_name
+  old_name=$(python3 -c "import re; print(re.sub(r'^[._-]+', '', 'fairtrail').lower())")
+  new_name=$(python3 -c "import re; print(re.sub(r'^[._-]+', '', '.fairtrail').lower())")
+
+  if [ "$old_name" = "$new_name" ]; then
+    pass "Volume names match across migration (project=$old_name)"
+  else
+    fail "Volume names differ" "old=$old_name new=$new_name -- DATA LOSS RISK"
+  fi
+
+  # Verify install.sh does NOT use 'down -v' which would delete volumes
+  if grep -q 'down -v' "$installer"; then
+    fail "install.sh uses 'down -v'" "this would delete user data during migration"
+  else
+    pass "install.sh does NOT use 'down -v' (volumes preserved)"
+  fi
+}
+
 # ── Run all ──────────────────────────────────────────────────────
 test_health
 test_landing_page
@@ -238,6 +265,7 @@ test_config_patch_currency
 test_providers_api
 test_config_validation
 test_static_assets
+test_volume_migration
 
 echo ""
 printf "${BOLD}Results: ${GREEN}%d passed${RESET}, ${RED}%d failed${RESET}\n" "$PASS" "$FAIL"

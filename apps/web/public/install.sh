@@ -548,29 +548,33 @@ else
   done
 fi
 
-$DC up -d 2>&1 | while IFS= read -r line; do
-  printf "  ${DIM}%s${RESET}\n" "$line"
-done
+if [ "${FAIRTRAIL_SKIP_START:-}" = "1" ]; then
+  ok "Skipping container start (test mode)"
+else
+  $DC up -d 2>&1 | while IFS= read -r line; do
+    printf "  ${DIM}%s${RESET}\n" "$line"
+  done
 
-echo ""
+  echo ""
 
-# ---------------------------------------------------------------------------
-# 9. Wait for the app to be ready
-# ---------------------------------------------------------------------------
-info "Waiting for the app to start..."
+  # ---------------------------------------------------------------------------
+  # 9. Wait for the app to be ready
+  # ---------------------------------------------------------------------------
+  info "Waiting for the app to start..."
 
-RETRIES=60
-until curl -sf "http://localhost:${HOST_PORT}/api/health" >/dev/null 2>&1; do
-  RETRIES=$((RETRIES - 1))
-  if [ "$RETRIES" -le 0 ]; then
-    warn "App didn't respond in 60s — run 'fairtrail logs' to debug"
-    break
+  RETRIES=60
+  until curl -sf "http://localhost:${HOST_PORT}/api/health" >/dev/null 2>&1; do
+    RETRIES=$((RETRIES - 1))
+    if [ "$RETRIES" -le 0 ]; then
+      warn "App didn't respond in 60s — run 'fairtrail logs' to debug"
+      break
+    fi
+    sleep 1
+  done
+
+  if [ "$RETRIES" -gt 0 ]; then
+    ok "Fairtrail is running"
   fi
-  sleep 1
-done
-
-if [ "$RETRIES" -gt 0 ]; then
-  ok "Fairtrail is running"
 fi
 
 # ---------------------------------------------------------------------------
