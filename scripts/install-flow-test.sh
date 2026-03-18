@@ -92,6 +92,18 @@ test_entrypoint_port_warning() {
 }
 
 # ---------------------------------------------------------------------------
+# Test: install.sh has test overrides for CI
+# ---------------------------------------------------------------------------
+test_install_overrides() {
+  local installer="apps/web/public/install.sh"
+  if grep -q 'FAIRTRAIL_IMAGE' "$installer" && grep -q 'FAIRTRAIL_CLI_SOURCE' "$installer"; then
+    pass "install.sh supports test overrides (FAIRTRAIL_IMAGE, FAIRTRAIL_CLI_SOURCE)"
+  else
+    fail "install.sh should support FAIRTRAIL_IMAGE and FAIRTRAIL_CLI_SOURCE overrides"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 echo ""
@@ -104,6 +116,7 @@ test_path_patches_both_files
 test_old_dir_migration
 test_env_host_port
 test_entrypoint_port_warning
+test_install_overrides
 
 echo ""
 printf "${BOLD}Results: ${GREEN}%d passed${RESET}, ${RED}%d failed${RESET}\n" "$PASS" "$FAIL"
