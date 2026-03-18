@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.3.8] - 2026-03-18
+
+### Added
+- Currency and country fields on the self-hosted settings page (matching admin config)
+- Health check for local providers (Ollama, llama.cpp, vLLM) before marking as "ready"
+- `'unreachable'` status in providers API for local providers that don't respond
+- Docker Compose integration test suite (17 checks against live app + DB + Redis)
+- Playwright browser smoke tests (10 checks: pages, inputs, navigation, static assets)
+- Debian Docker end-to-end installer test (17 checks in real Debian container)
+- Staging test that runs on the production server (22 checks via SSH)
+- Vitest and shell tests now run in CI on every PR
+- Volume migration safety tests (project name match, no `down -v`)
+- `FAIRTRAIL_SKIP_START` and `FAIRTRAIL_SKIP_PULL` install.sh overrides for test automation
+- Non-interactive mode (`FAIRTRAIL_YES=1`) skips API key prompt
+
+### Fixed
+- `fairtrail update` hardcoded `~/.local/bin/fairtrail` instead of detecting the actual binary path ([#8](https://github.com/affromero/fairtrail/issues/8))
+- `fairtrail update` swallowed curl errors with `2>/dev/null`
+- CLI not in PATH on Debian SSH sessions (installer patched `.bashrc` but not `.profile`)
+- Old `~/fairtrail` directories left behind after migration to `~/.fairtrail`
+- Ollama, llama.cpp, and vLLM shown as "ready" even when unreachable
+- `HOST_PORT` vs `PORT` confusion in generated `.env` (now documented with warning in entrypoint)
+
 ## [0.3.7] - 2026-03-17
 
 ### Added
