@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.10] - 2026-03-23
+
+### Added
+- Flight departure and arrival times in chart tooltips, price history table, best price card, and CSV export ([#21](https://github.com/affromero/fairtrail/issues/21), requested by [@jschwalbe](https://github.com/jschwalbe))
+- Flight times exposed in the public prices API (`/api/queries/[id]/prices`)
+
+### Fixed
+- Chromium page crashes in Docker on Unraid and other platforms with restrictive IPC defaults; added `ipc: host` per Playwright recommendation ([#19](https://github.com/affromero/fairtrail/issues/19), reported by [@luciodaou](https://github.com/luciodaou))
+- Shell scripts getting CRLF line endings on Windows clones, crashing `docker-entrypoint.sh`; added `.gitattributes` with `eol=lf` ([#22](https://github.com/affromero/fairtrail/issues/22), reported by [@luciodaou](https://github.com/luciodaou), PR [#23](https://github.com/affromero/fairtrail/pull/23))
+- Playwright `networkidle` wait causing page crashes on memory-constrained hosts; switched to `domcontentloaded` ([#19](https://github.com/affromero/fairtrail/issues/19), reported by [@luciodaou](https://github.com/luciodaou))
+- Duplicate sold-out snapshots created on every scrape run ([#18](https://github.com/affromero/fairtrail/issues/18), reported by [@Nanorithm](https://github.com/Nanorithm))
+
+### Documentation
+- Added related projects section to README
+
 ## [0.3.9] - 2026-03-20
 
 ### Added
