@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.11] - 2026-03-25
+
+### Fixed
+- Community sync dynamic import now resolves correctly in Docker production builds; removed `webpackIgnore` comment that caused module resolution to fail at runtime
+
 ## [0.3.10] - 2026-03-23
 
 ### Added
