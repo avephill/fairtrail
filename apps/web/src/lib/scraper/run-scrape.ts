@@ -282,7 +282,7 @@ export async function cleanupUnvisitedQueries(): Promise<number> {
 
 async function trySyncToHub(): Promise<void> {
   try {
-    const { syncToHub } = await import(/* webpackIgnore: true */ '../community-sync');
+    const { syncToHub } = await import('../community-sync');
     await syncToHub();
   } catch (err) {
     console.error('[community] Sync error:', err instanceof Error ? err.message : err);
