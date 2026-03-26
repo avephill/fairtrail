@@ -1,9 +1,11 @@
 # Changelog
 
-## [0.3.11] - 2026-03-25
+## [0.3.11] - 2026-03-26
 
 ### Fixed
-- Community sync dynamic import now resolves correctly in Docker production builds; removed `webpackIgnore` comment that caused module resolution to fail at runtime
+- Round-trip queries showing departure date as both departure and return date; `returnDate` was dropped from the preview-to-query pipeline ([#28](https://github.com/affromero/fairtrail/issues/28), reported by [@Fenisu](https://github.com/Fenisu))
+- CLI (`fairtrail-cli`) also dropping `date` and `returnDate` when creating trackers from preview results
+- Community sync dynamic import now resolves correctly in Docker production builds; removed `webpackIgnore` comment that caused module resolution to fail at runtime ([#27](https://github.com/affromero/fairtrail/pull/27), contributed by [@ms32035](https://github.com/ms32035))
 
 ## [0.3.10] - 2026-03-23
 
