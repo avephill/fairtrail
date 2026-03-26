@@ -166,4 +166,50 @@ describe('POST /api/queries', () => {
     const body = await res.json();
     expect(body.data.queries).toHaveLength(2);
   });
+
+  it('persists return date separately from outbound date on round-trip pinned routes', async () => {
+    const pinnedRoundTrip = {
+      ...validBody,
+      routes: [{
+        origin: 'JFK',
+        originName: 'New York JFK',
+        destination: 'CDG',
+        destinationName: 'Paris CDG',
+        date: '2026-06-15',
+        returnDate: '2026-06-22',
+        selectedFlights: [],
+      }],
+    };
+    const res = await POST(makeRequest(pinnedRoundTrip));
+    expect(res.status).toBe(201);
+
+    const createCall = mockQueryCreate.mock.calls[0][0];
+    expect(createCall.data.dateFrom).toEqual(new Date('2026-06-15T00:00:00Z'));
+    expect(createCall.data.dateTo).toEqual(new Date('2026-06-22T00:00:00Z'));
+
+    const body = await res.json();
+    expect(body.data.queries[0].date).toBe('2026-06-15');
+    expect(body.data.queries[0].returnDate).toBe('2026-06-22');
+  });
+
+  it('falls back to outbound date for dateTo when returnDate is absent (one-way)', async () => {
+    const pinnedOneWay = {
+      ...validBody,
+      tripType: 'one_way',
+      routes: [{
+        origin: 'JFK',
+        originName: 'New York JFK',
+        destination: 'LAX',
+        destinationName: 'Los Angeles',
+        date: '2026-06-15',
+        selectedFlights: [],
+      }],
+    };
+    const res = await POST(makeRequest(pinnedOneWay));
+    expect(res.status).toBe(201);
+
+    const createCall = mockQueryCreate.mock.calls[0][0];
+    expect(createCall.data.dateFrom).toEqual(new Date('2026-06-15T00:00:00Z'));
+    expect(createCall.data.dateTo).toEqual(new Date('2026-06-15T00:00:00Z'));
+  });
 });
