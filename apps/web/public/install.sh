@@ -28,7 +28,7 @@ INSTALL_BIN="$HOME/.local/bin"
 HOST_PORT="${HOST_PORT:-${PORT:-3003}}"
 BASE_URL="${FAIRTRAIL_URL:-https://fairtrail.org}"
 # Test overrides (used by scripts/install-flow-test.sh)
-FAIRTRAIL_IMAGE="${FAIRTRAIL_IMAGE:-ghcr.io/affromero/fairtrail:latest}"
+FAIRTRAIL_REPO="https://github.com/affromero/fairtrail.git"
 FAIRTRAIL_API_KEY="${FAIRTRAIL_API_KEY:-}"
 FAIRTRAIL_API_PROVIDER="${FAIRTRAIL_API_PROVIDER:-}"
 FAIRTRAIL_EXTRA_ENV="${FAIRTRAIL_EXTRA_ENV:-}"
@@ -46,7 +46,7 @@ echo ""
 printf "  ${DIM}1.${RESET} Install 3 Docker containers to ${BOLD}~/.fairtrail/${RESET}\n"
 printf "     ${DIM}• PostgreSQL 16 (your local database — nothing leaves your machine)${RESET}\n"
 printf "     ${DIM}• Redis 7 (local cache)${RESET}\n"
-printf "     ${DIM}• Fairtrail web app (from ghcr.io/affromero/fairtrail)${RESET}\n"
+printf "     ${DIM}• Fairtrail web app (built locally from source)${RESET}\n"
 echo ""
 printf "  ${DIM}2.${RESET} Download the ${BOLD}fairtrail${RESET} CLI to ${BOLD}~/.local/bin/${RESET}\n"
 echo ""
@@ -95,6 +95,10 @@ install_docker_linux() {
   warn "You were added to the docker group. Log out and back in, then re-run this installer."
   exit 0
 }
+
+if ! command -v git &>/dev/null; then
+  fail "git is required to install Fairtrail.\n\n  Install: ${BOLD}sudo apt install git${RESET} (Debian/Ubuntu) or ${BOLD}sudo dnf install git${RESET} (Fedora)"
+fi
 
 if command -v docker &>/dev/null; then
   CONTAINER_CMD=docker
@@ -230,6 +234,15 @@ fi
 # ---------------------------------------------------------------------------
 mkdir -p "$FAIRTRAIL_DIR"
 
+# Clone the repo (used for local Docker builds)
+if [ -d "$FAIRTRAIL_DIR/repo/.git" ]; then
+  info "Updating source..."
+  git -C "$FAIRTRAIL_DIR/repo" pull --ff-only -q 2>/dev/null || true
+else
+  info "Cloning Fairtrail source..."
+  git clone --depth 1 -q "$FAIRTRAIL_REPO" "$FAIRTRAIL_DIR/repo"
+fi
+
 EXTRA_HOSTS_BLOCK=""
 if [ "$CONTAINER_CMD" != "podman" ]; then
   EXTRA_HOSTS_BLOCK='    extra_hosts:
@@ -269,7 +282,8 @@ services:
       retries: 5
 
   web:
-    image: ${FAIRTRAIL_IMAGE}
+    build: ./repo
+    image: fairtrail:local
     restart: unless-stopped
     depends_on:
       db:
@@ -550,13 +564,13 @@ fi
 # ---------------------------------------------------------------------------
 cd "$FAIRTRAIL_DIR"
 
-if [ "${FAIRTRAIL_SKIP_PULL:-}" = "1" ]; then
-  ok "Using local image (pull skipped)"
+if [ "${FAIRTRAIL_SKIP_BUILD:-}" = "1" ]; then
+  ok "Using existing image (build skipped)"
 else
-  info "Pulling Fairtrail (this takes a minute on first run)..."
+  info "Building Fairtrail (this takes a few minutes on first run)..."
   echo ""
 
-  $DC pull 2>&1 | while IFS= read -r line; do
+  $DC build 2>&1 | while IFS= read -r line; do
     printf "  ${DIM}%s${RESET}\n" "$line"
   done
 fi
