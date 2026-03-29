@@ -109,6 +109,7 @@ cmd_start_foreground() {
     exit 1
   fi
 
+
   echo ""
   printf "${BOLD}  Fairtrail${RESET}\n"
   printf "  ${DIM}The price trail airlines don't show you${RESET}\n"
@@ -151,6 +152,7 @@ cmd_start_background() {
     printf "${RED}${BOLD}✗${RESET} Docker is not running. Start Docker Desktop and try again.\n"
     exit 1
   fi
+
 
   dc up -d 2>&1 | while IFS= read -r line; do
     printf "  ${DIM}%s${RESET}\n" "$line"
@@ -245,6 +247,7 @@ cmd_update() {
       printf "  ${DIM}%s${RESET}\n" "$line"
     done
   fi
+
 
   dc up -d 2>&1 | while IFS= read -r line; do
     printf "  ${DIM}%s${RESET}\n" "$line"
