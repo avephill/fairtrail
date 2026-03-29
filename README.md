@@ -320,10 +320,45 @@ That said, automated access to third-party websites may conflict with their term
 
 This software is provided as-is for personal and educational use.
 
+## Why Playwright + LLM Instead of Google's Internal API?
+
+Google Flights has an undocumented internal API (`GetShoppingResults`, `GetCalendarGraph`) that returns structured JSON without a browser. The [`fli`](https://github.com/punitarani/fli) project reverse-engineers it. We investigated this approach and decided against it. Here's why.
+
+**What the direct API gives you:** sub-second searches, no browser dependency, no Chromium in Docker, no LLM cost per extraction.
+
+**What it costs you:**
+
+|  | Fairtrail | [fli](https://github.com/punitarani/fli) |
+|---|---|---|
+| Approach | Playwright + LLM extraction | Reverse-engineered internal API |
+| Language | TypeScript (Next.js) | Python |
+| Speed | 3-10s per search (browser + LLM) | Sub-second (single HTTP POST) |
+| LLM cost | None (local/subscription) or pay-per-token | None |
+| Docker image | ~400MB (Chromium) | ~20MB |
+| Booking links | Yes -- captures redirect URLs | No |
+| Currency control | Yes (`&curr=`, `&gl=` params) | No -- determined by server IP geolocation |
+| Fare class / cabin details | Yes -- visible in page | No |
+| Seats remaining | Yes -- "3 seats left" badges | No |
+| Baggage info | Yes -- in expanded details | No |
+| Departure/arrival times | Yes | Yes |
+| Multi-city | Yes | Partial (open PR) |
+| Proxy support | Native (Playwright launch args) | None built-in |
+| Price tracking | Built-in (cron + Postgres) | Manual re-querying |
+| Shareable charts | Yes (`/q/[id]`) | No |
+
+**The deeper reason:** Fairtrail is a price *tracker*, not a price *search engine*. It runs a cron every 3 hours across a handful of active queries. Speed doesn't matter -- data completeness does. Booking links, seat counts, and fare classes are what make the price chart useful for deciding when to buy.
+
+Both approaches share the same fundamental risk: Google can break either one at any time. DOM changes break Playwright selectors; internal response structure changes break array-index parsing. Neither has a contract. We'd rather depend on the stable, public-facing UI than on undocumented internal array positions where airline data lives at `fl[22][0]` and prices at `data[1][0][-1]`.
+
+**Use Fairtrail if** you want to track prices over time, see trends, get booking links, and share charts. You care about data completeness more than speed.
+
+**Use [fli](https://github.com/punitarani/fli) if** you want instant, programmatic flight lookups from scripts or agents. You don't need booking URLs, price history, or a UI -- just fast structured results.
+
 ## Related Projects
 
 | Project | Description |
 |---------|-------------|
+| [**fli**](https://github.com/punitarani/fli) | Google Flights API reverse-engineering (Python) -- see [comparison above](#why-playwright--llm-instead-of-googles-internal-api) |
 | [**PriceToken**](https://github.com/affromero/pricetoken) | Real-time LLM pricing API, npm/PyPI packages, and live dashboard |
 | [**gitpane**](https://github.com/affromero/gitpane) | Multi-repo Git workspace dashboard for the terminal |
 | [**kin3o**](https://github.com/affromero/kin3o) | AI-powered Lottie animation generator CLI |

@@ -106,6 +106,12 @@ Fonts: Bricolage Grotesque (display), Outfit (body), IBM Plex Mono (data).
 
 Departure board / atmospheric aviation aesthetic — deep navy, amber glow, precise typography.
 
+## Scraping Constraints
+
+- **Rate limit:** Google returns HTTP 429 after ~30 sustained requests from the same IP. The default 3h cron interval stays well under this.
+- **RT pricing:** Google Flights shows the full round-trip price on each flight result. The extraction prompt accounts for this -- do not sum outbound + return prices.
+- **Google internal API:** undocumented endpoints exist (`GetShoppingResults`, `GetCalendarGraph`, `GetExploreDestinations`) but lack booking URLs, currency control, fare classes, and seat counts. We use Playwright for data completeness. See README comparison.
+
 ## Engineering Patterns
 
 - **Component**: `Name.tsx` + `Name.module.css`. Named export, `styles.root`.
