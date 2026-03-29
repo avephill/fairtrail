@@ -378,6 +378,35 @@ if command -v claude &>/dev/null && [ -d "$HOME/.claude" ]; then
   ok "Claude Code CLI detected — no API key needed"
 fi
 
+# On macOS, Claude Code stores OAuth tokens in the system Keychain, which is
+# inaccessible from inside Docker. A separate long-lived token is needed.
+CLAUDE_SETUP_TOKEN=""
+if [ "$CLAUDE_CODE_DETECTED" = true ] && [ "$OS" = "macos" ]; then
+  echo ""
+  warn "macOS detected — Docker cannot access your Claude Code Keychain credentials"
+  echo ""
+  printf "  ${DIM}To use your Claude subscription inside Docker, you need a separate token.${RESET}\n"
+  printf "  ${DIM}This is a one-time setup — the token lasts 1 year.${RESET}\n"
+  echo ""
+  printf "  ${BOLD}1.${RESET} Open another terminal and run:  ${BOLD}claude setup-token${RESET}\n"
+  printf "  ${BOLD}2.${RESET} Complete the browser authorization\n"
+  printf "  ${BOLD}3.${RESET} Paste the token here (starts with sk-ant-)\n"
+  echo ""
+
+  if [ "${FAIRTRAIL_YES:-}" = "1" ]; then
+    warn "Non-interactive mode — skipping setup-token prompt"
+  else
+    read -rsp "  Token (or Enter to skip): " CLAUDE_SETUP_TOKEN < /dev/tty
+    echo ""
+    if [ -n "$CLAUDE_SETUP_TOKEN" ]; then
+      ok "Claude Code setup token saved"
+    else
+      warn "Skipped — Claude Code will not work until you configure a token"
+      printf "  ${DIM}You can add it later: edit ~/.fairtrail/.env and add CLAUDE_CODE_OAUTH_TOKEN=sk-ant-...${RESET}\n"
+    fi
+  fi
+fi
+
 if command -v codex &>/dev/null && [ -d "$HOME/.codex" ]; then
   CODEX_DETECTED=true
   ok "Codex CLI detected — no API key needed"
@@ -479,6 +508,11 @@ else
       echo "# Ollama (Docker-compatible address)"
       echo "OLLAMA_HOST=${OLLAMA_HOST_VAL}"
     fi
+    if [ -n "${CLAUDE_SETUP_TOKEN:-}" ]; then
+      echo ""
+      echo "# Claude Code setup token (long-lived, from 'claude setup-token')"
+      echo "CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_SETUP_TOKEN}"
+    fi
     if [ -n "$FAIRTRAIL_EXTRA_ENV" ]; then
       echo ""
       echo "# Extra env (test overrides)"
@@ -574,6 +608,7 @@ else
     printf "  ${DIM}%s${RESET}\n" "$line"
   done
 fi
+
 
 if [ "${FAIRTRAIL_SKIP_START:-}" = "1" ]; then
   ok "Skipping container start (test mode)"

@@ -86,6 +86,7 @@ if [ "${SELF_HOSTED:-true}" = "true" ]; then
     fi
   fi
 
+
   # Install CLI providers (cached in cli-cache volume)
   if ! command -v claude >/dev/null 2>&1; then
     echo "[setup] Installing Claude Code CLI..."

@@ -380,7 +380,8 @@ async function hasCliAuth(provider: string): Promise<boolean> {
       return existsSync(join(home, '.codex', 'auth.json'));
     case 'claude-code':
       return existsSync(join(home, '.claude.json'))
-        || existsSync(join(home, '.claude', 'credentials.json'));
+        || existsSync(join(home, '.claude', 'credentials.json'))
+        || existsSync(join(home, '.claude', '.credentials.json'));
     default:
       return false;
   }
