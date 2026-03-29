@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.12] - 2026-03-29
+
+### Added
+- Fairtrail vs fli comparison in README: side-by-side table explaining why we use Playwright + LLM instead of Google's internal API
+- Scraping constraints section in CLAUDE.md (rate limits, RT pricing, internal API reference)
+- Docker images now built locally with pull-with-fallback, removing dependency on GHCR availability
+- Native ARM64 Docker builds via ubuntu-24.04-arm runner
+
+### Fixed
+- `xxd` dependency removed from install script (not available on Raspberry Pi / ARM)
+- OCI labels restored on per-platform Docker builds
+- Round-trip price extraction prompt now explicitly notes Google shows combined RT prices
+
+### Changed
+- CI deploy and notify jobs removed; build workflow renamed to `build.yml`
+
 ## [0.3.11] - 2026-03-26
 
 ### Fixed
