@@ -333,7 +333,7 @@ Google Flights has an undocumented internal API (`GetShoppingResults`, `GetCalen
 | Approach | Playwright + LLM extraction | Reverse-engineered internal API |
 | Language | TypeScript (Next.js) | Python |
 | Speed | 3-10s per search (browser + LLM) | Sub-second (single HTTP POST) |
-| LLM cost | None (local models) or ~$0.001/search (Haiku) | None |
+| LLM cost | None (local/subscription) or pay-per-token | None |
 | Docker image | ~400MB (Chromium) | ~20MB |
 | Booking links | Yes -- captures redirect URLs | No |
 | Currency control | Yes (`&curr=`, `&gl=` params) | No -- determined by server IP geolocation |
