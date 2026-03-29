@@ -356,8 +356,6 @@ Both approaches share the same fundamental risk: Google can break either one at 
 - The `GetExploreDestinations` endpoint exists for "cheapest flights from X" -- potential future feature
 - Position `[1][28]` in the internal API controls Basic Economy filtering -- useful reference if we ever need it
 
-See [LEARNINGS.md](LEARNINGS.md) for the full technical investigation.
-
 ## Related Projects
 
 | Project | Description |

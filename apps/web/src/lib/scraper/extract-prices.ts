@@ -88,6 +88,7 @@ ${filterSection}
 General rules:
 - Return at most ${maxResults} results, sorted by price (cheapest first)
 - Price must be a number (no $ sign, no commas)
+- For round-trip searches, Google Flights shows the FULL round-trip price on each flight. Do NOT halve or double it — extract the price exactly as shown
 ${currencyInstruction}
 ${bookingUrlRule}
 - stops: 0 for nonstop, 1 for 1 stop, etc.
