@@ -300,6 +300,46 @@
   color: var(--accent);
 }
 
+.providerCardWrapper {
+  display: contents;
+}
+
+.providerConfigure {
+  grid-column: 1 / -1;
+  padding: 0.75rem;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.providerConfigHint {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.providerConfigHint code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  background: var(--surface);
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  color: var(--accent);
+}
+
+.providerConfigRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.providerConfigRow .input {
+  flex: 1;
+}
+
 .vpnProviderGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;

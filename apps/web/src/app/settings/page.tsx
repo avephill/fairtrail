@@ -37,6 +37,9 @@ export default function SettingsPage() {
   const [vpnCodeMessage, setVpnCodeMessage] = useState('');
   const [hasVpnCode, setHasVpnCode] = useState(false);
   const [detectedProviders, setDetectedProviders] = useState<string[]>([]);
+  const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
+  const [providerKeyInput, setProviderKeyInput] = useState('');
+  const [providerKeySaving, setProviderKeySaving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -73,7 +76,7 @@ export default function SettingsPage() {
   useEffect(() => {
     fetch('/api/setup/status')
       .then((r) => r.json())
-      .then((d) => { if (d.ok) setDetectedProviders(d.data.detectedProviders); })
+      .then((d) => { setDetectedProviders(d.detectedProviders ?? d.data?.detectedProviders ?? []); })
       .catch(() => {});
 
     fetch('/api/admin/config')
@@ -179,28 +182,101 @@ export default function SettingsPage() {
             <div className={styles.providerGrid}>
               {Object.entries(EXTRACTION_PROVIDERS).map(([key, p]) => {
                 const detected = detectedProviders.includes(key);
+                const isCli = !!CLI_PROVIDERS[key];
+                const isLocal = LOCAL_PROVIDERS.has(key);
                 return (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`${styles.providerCard} ${provider === key ? styles.providerCardSelected : ''} ${!detected ? styles.providerCardUnavailable : ''}`}
-                    onClick={() => handleProviderChange(key)}
-                  >
-                    <span className={styles.providerCardName}>{p.displayName}</span>
-                    <span className={styles.providerCardStatus}>
-                      {detected
-                        ? CLI_PROVIDERS[key]
-                          ? 'Your subscription'
-                          : LOCAL_PROVIDERS.has(key)
-                            ? 'Local'
-                            : 'Ready'
-                        : CLI_PROVIDERS[key]
-                          ? 'Not installed'
-                          : LOCAL_PROVIDERS.has(key)
-                            ? 'Local'
-                            : 'No key'}
-                    </span>
-                  </button>
+                  <div key={key} className={styles.providerCardWrapper}>
+                    <button
+                      type="button"
+                      className={`${styles.providerCard} ${provider === key ? styles.providerCardSelected : ''} ${!detected && !isLocal ? styles.providerCardUnavailable : ''}`}
+                      onClick={() => {
+                        if (detected || isLocal) {
+                          handleProviderChange(key);
+                          setConfiguringProvider(null);
+                        } else {
+                          setConfiguringProvider(configuringProvider === key ? null : key);
+                          setProviderKeyInput('');
+                        }
+                      }}
+                    >
+                      <span className={styles.providerCardName}>{p.displayName}</span>
+                      <span className={styles.providerCardStatus}>
+                        {detected
+                          ? isCli ? 'Your subscription' : isLocal ? 'Local' : 'Ready'
+                          : isCli ? 'Set up' : isLocal ? 'Local' : 'Add key'}
+                      </span>
+                    </button>
+                    {configuringProvider === key && !detected && (
+                      <div className={styles.providerConfigure}>
+                        {isCli && key === 'claude-code' ? (
+                          <>
+                            <p className={styles.providerConfigHint}>
+                              Run <code>claude setup-token</code> in your terminal, then paste the token:
+                            </p>
+                            <div className={styles.providerConfigRow}>
+                              <input
+                                type="password"
+                                className={styles.input}
+                                placeholder="Paste setup token"
+                                value={providerKeyInput}
+                                onChange={(e) => setProviderKeyInput(e.target.value)}
+                                autoFocus
+                              />
+                              <button
+                                className={styles.saveButton}
+                                disabled={providerKeySaving || !providerKeyInput}
+                                onClick={async () => {
+                                  setProviderKeySaving(true);
+                                  // TODO: save Claude Code setup token to container
+                                  // For now, show instructions
+                                  setProviderKeySaving(false);
+                                  setMessage('Add CLAUDE_CODE_OAUTH_TOKEN to ~/.fairtrail/.env and restart');
+                                  setConfiguringProvider(null);
+                                }}
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </>
+                        ) : isCli && key === 'codex' ? (
+                          <>
+                            <p className={styles.providerConfigHint}>
+                              Codex CLI needs to be installed on the host. Run <code>npm i -g @openai/codex</code>.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className={styles.providerConfigHint}>
+                              Paste your {p.displayName} API key:
+                            </p>
+                            <div className={styles.providerConfigRow}>
+                              <input
+                                type="password"
+                                className={styles.input}
+                                placeholder={`${p.envKey}`}
+                                value={providerKeyInput}
+                                onChange={(e) => setProviderKeyInput(e.target.value)}
+                                autoFocus
+                              />
+                              <button
+                                className={styles.saveButton}
+                                disabled={providerKeySaving || !providerKeyInput}
+                                onClick={async () => {
+                                  setProviderKeySaving(true);
+                                  setMessage(`Add ${p.envKey}=${providerKeyInput.slice(0, 8)}... to ~/.fairtrail/.env and restart`);
+                                  setProviderKeySaving(false);
+                                  setConfiguringProvider(null);
+                                  setProviderKeyInput('');
+                                }}
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
