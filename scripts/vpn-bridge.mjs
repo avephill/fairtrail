@@ -69,6 +69,20 @@ async function getLocations() {
 
 async function connect(locationName) {
   console.log(`[vpn-bridge] connecting to ${locationName}...`);
+
+  // Disconnect first if already connected to a different location
+  const currentStatus = await getStatus();
+  if (currentStatus.connected) {
+    console.log(`[vpn-bridge] disconnecting from ${currentStatus.location} first...`);
+    await rpcCall('XVPN.Disconnect');
+    // Wait for disconnect
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const s = await getStatus();
+      if (!s.connected) break;
+    }
+  }
+
   const locations = await getLocations();
   const match = locations.find((l) =>
     l.name.toLowerCase().includes(locationName.toLowerCase()) ||
