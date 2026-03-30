@@ -265,7 +265,7 @@ export function PriceChart({ snapshots, currency = 'USD' }: { snapshots: Snapsho
             y: -0.15,
             font: { size: 11 },
           },
-          hovermode: 'closest',
+          hovermode: 'x unified',
           autosize: true,
         }}
         config={{
