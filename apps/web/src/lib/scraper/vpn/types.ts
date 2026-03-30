@@ -25,5 +25,5 @@ export interface VpnProvider {
   isSystemWide(): boolean;
 
   /** Get the SOCKS5/HTTP proxy URL for Playwright (only for non-system-wide providers) */
-  getProxyUrl?(): string;
+  getProxyUrl?(): string | undefined;
 }
