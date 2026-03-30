@@ -382,17 +382,25 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
           type="button"
           className={styles.randomFlight}
           onClick={() => {
+            // Generate dates 3-6 weeks from now for realistic searches
+            const base = new Date();
+            base.setDate(base.getDate() + 21 + Math.floor(Math.random() * 21));
+            const dep = base.toISOString().split('T')[0]!;
+            const ret = new Date(base);
+            ret.setDate(ret.getDate() + 5 + Math.floor(Math.random() * 5));
+            const retStr = ret.toISOString().split('T')[0]!;
+
             const routes = [
-              'NYC to London next week',
-              'LAX to Tokyo in 2 weeks round trip',
-              'Chicago to Rome next month flexible',
-              'Miami to Bogota this weekend one way',
-              'San Francisco to Paris June 20 ± 3 days',
-              'Boston to Barcelona next month under $600',
-              'Seattle to Seoul in 3 weeks',
-              'Denver to Amsterdam next month economy',
-              'Dallas to Cancun this weekend',
-              'Atlanta to Dublin in 2 weeks round trip',
+              `JFK to CDG ${dep} to ${retStr} round trip economy`,
+              `LAX to NRT ${dep} to ${retStr} round trip economy`,
+              `ORD to FCO ${dep} to ${retStr} round trip economy`,
+              `MIA to BOG ${dep} one way economy`,
+              `SFO to LHR ${dep} to ${retStr} round trip economy`,
+              `BOS to BCN ${dep} to ${retStr} round trip economy`,
+              `SEA to ICN ${dep} to ${retStr} round trip economy`,
+              `DEN to AMS ${dep} to ${retStr} round trip economy`,
+              `DFW to CUN ${dep} to ${retStr} round trip economy`,
+              `ATL to DUB ${dep} to ${retStr} round trip economy`,
             ];
             const pick = routes[Math.floor(Math.random() * routes.length)]!;
             setQuery(pick);
