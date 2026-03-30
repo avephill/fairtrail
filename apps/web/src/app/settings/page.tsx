@@ -514,11 +514,7 @@ export default function SettingsPage() {
               </div>
               <div className={styles.vpnStep}>
                 <span className={styles.vpnStepNum}>2</span>
-                <span>Paste it above and save (encrypted before storage)</span>
-              </div>
-              <div className={styles.vpnStep}>
-                <span className={styles.vpnStepNum}>3</span>
-                <span>Restart with: <code>docker compose -f ... -f docker-compose.vpn.yml up -d</code></span>
+                <span>Paste it above and save -- your code is encrypted before storage</span>
               </div>
             </div>
 
