@@ -39,6 +39,13 @@ export async function launchBrowser(): Promise<Browser> {
       '--disable-blink-features=AutomationControlled',
       '--disable-infobars',
       '--window-size=1440,900',
+      // Docker Desktop (macOS/Windows) runs in a VM where Chromium's GPU
+      // crashes. These extra flags are safe everywhere but only needed in VMs.
+      // Always include them -- the perf cost is negligible for headless scraping.
+      '--single-process',
+      '--use-gl=angle',
+      '--use-angle=swiftshader',
+      '--in-process-gpu',
     ],
   });
 }
