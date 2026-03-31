@@ -34,7 +34,7 @@ export function AirportCombobox({
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const displayValue = value ? `${value.code} — ${value.name}` : query;
+  const displayValue = value ? `${value.code} - ${value.name}` : query;
 
   const fetchResults = useCallback(async (q: string) => {
     if (q.length < 2) {
@@ -174,7 +174,7 @@ export function AirportCombobox({
               onMouseEnter={() => setActiveIndex(i)}
             >
               <span className={styles.optionCode}>{r.code}</span>
-              <span className={styles.optionName}>{r.city} — {r.name}</span>
+              <span className={styles.optionName}>{r.city} - {r.name}</span>
               <span className={styles.optionCountry}>{r.country}</span>
             </li>
           ))}
