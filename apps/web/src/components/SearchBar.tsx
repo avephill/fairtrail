@@ -8,6 +8,7 @@ import { ConfirmationCard, type ParsedQuery } from './ConfirmationCard';
 import { ClarificationCard } from './ClarificationCard';
 import { FlightPicker, type RouteFlights } from './FlightPicker';
 import { LinkBanner, type CreatedTracker } from './LinkBanner';
+import { ManualEntryForm } from './ManualEntryForm';
 import type { PriceData } from '@/lib/scraper/extract-prices';
 import { detectLocaleCurrency } from '@/lib/currency';
 
@@ -65,6 +66,10 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
 
   // Link banner state — multiple trackers
   const [createdTrackers, setCreatedTrackers] = useState<CreatedTracker[] | null>(null);
+
+  // Manual entry mode
+  const [manualMode, setManualMode] = useState(false);
+  const [manualRawInput, setManualRawInput] = useState('');
 
   const doParse = useCallback(async (input: string, history: ConversationMessage[]) => {
     setLoading(true);
@@ -192,7 +197,7 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          rawInput: query.trim(),
+          rawInput: manualRawInput || query.trim(),
           dateFrom: parsed.dateFrom,
           dateTo: parsed.dateTo,
           flexibility: parsed.flexibility,
@@ -267,6 +272,8 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
     setPreviewRoutes(null);
     setPreviewLoading(false);
     setCreatedTrackers(null);
+    setManualMode(false);
+    setManualRawInput('');
     inputRef.current?.focus();
   };
 
@@ -277,83 +284,111 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
 
   return (
     <div className={styles.root}>
-      <div className={styles.inputWrapper}>
-        <input
-          ref={inputRef}
-          type="text"
-          className={styles.input}
-          placeholder='NYC to Paris around June 15 ± 3 days'
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={loading}
-          autoFocus
-        />
-        <button
-          className={styles.searchButton}
-          onClick={handleParse}
-          disabled={loading || query.trim().length < 5}
-        >
-          {loading ? (
-            <span className={styles.spinner} />
-          ) : (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          )}
-        </button>
-      </div>
-
-      <div className={styles.hints}>
-        {['JFK to CDG June 15-20', 'London to Tokyo next month flexible', 'SFO to LAX March 20 ± 2 days'].map((example, i) => (
-          <span key={i}>
-            {i > 0 && <span className={styles.hintSep}>&middot; </span>}
-            <button
-              type="button"
-              className={styles.hintBtn}
-              onClick={() => { setQuery(example); inputRef.current?.focus(); }}
-            >
-              {example}
-            </button>
-          </span>
-        ))}
-      </div>
-
-      {!parsed && !loading && (
-        <button
-          type="button"
-          className={styles.randomFlight}
-          onClick={() => {
-            // Generate dates 3-6 weeks from now for realistic searches
-            const base = new Date();
-            base.setDate(base.getDate() + 21 + Math.floor(Math.random() * 21));
-            const dep = base.toISOString().split('T')[0]!;
-            const ret = new Date(base);
-            ret.setDate(ret.getDate() + 5 + Math.floor(Math.random() * 5));
-            const retStr = ret.toISOString().split('T')[0]!;
-
-            const routes = [
-              `JFK to CDG ${dep} to ${retStr} round trip economy`,
-              `LAX to NRT ${dep} to ${retStr} round trip economy`,
-              `ORD to FCO ${dep} to ${retStr} round trip economy`,
-              `MIA to BOG ${dep} one way economy`,
-              `SFO to LHR ${dep} to ${retStr} round trip economy`,
-              `BOS to BCN ${dep} to ${retStr} round trip economy`,
-              `SEA to ICN ${dep} to ${retStr} round trip economy`,
-              `DEN to AMS ${dep} to ${retStr} round trip economy`,
-              `DFW to CUN ${dep} to ${retStr} round trip economy`,
-              `ATL to DUB ${dep} to ${retStr} round trip economy`,
-            ];
-            const pick = routes[Math.floor(Math.random() * routes.length)]!;
-            setQuery(pick);
-            doParse(pick, []);
+      {manualMode ? (
+        <ManualEntryForm
+          onSubmit={(q, rawInput) => {
+            setParsed(q);
+            setManualRawInput(rawInput);
+            setManualMode(false);
           }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22M22 6l-4-4M22 6l-4 4M2 6h1.4c1.3 0 2.5.6 3.3 1.7l6.1 8.6c.7 1.1 2 1.7 3.3 1.7H22M22 18l-4-4M22 18l-4 4" />
-          </svg>
-          Try a random flight
-        </button>
+          onCancel={() => setManualMode(false)}
+          adminCurrency={adminCurrency}
+        />
+      ) : (
+        <>
+          <div className={styles.inputWrapper}>
+            <input
+              ref={inputRef}
+              type="text"
+              className={styles.input}
+              placeholder='NYC to Paris around June 15 ± 3 days'
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={loading}
+              autoFocus
+            />
+            <button
+              className={styles.searchButton}
+              onClick={handleParse}
+              disabled={loading || query.trim().length < 5}
+            >
+              {loading ? (
+                <span className={styles.spinner} />
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          <div className={styles.hints}>
+            {['JFK to CDG June 15-20', 'London to Tokyo next month flexible', 'SFO to LAX March 20 ± 2 days'].map((example, i) => (
+              <span key={i}>
+                {i > 0 && <span className={styles.hintSep}>&middot; </span>}
+                <button
+                  type="button"
+                  className={styles.hintBtn}
+                  onClick={() => { setQuery(example); inputRef.current?.focus(); }}
+                >
+                  {example}
+                </button>
+              </span>
+            ))}
+          </div>
+
+          {!parsed && !loading && (
+            <>
+              <button
+                type="button"
+                className={styles.randomFlight}
+                onClick={() => {
+                  const base = new Date();
+                  base.setDate(base.getDate() + 21 + Math.floor(Math.random() * 21));
+                  const dep = base.toISOString().split('T')[0]!;
+                  const ret = new Date(base);
+                  ret.setDate(ret.getDate() + 5 + Math.floor(Math.random() * 5));
+                  const retStr = ret.toISOString().split('T')[0]!;
+
+                  const routes = [
+                    `JFK to CDG ${dep} to ${retStr} round trip economy`,
+                    `LAX to NRT ${dep} to ${retStr} round trip economy`,
+                    `ORD to FCO ${dep} to ${retStr} round trip economy`,
+                    `MIA to BOG ${dep} one way economy`,
+                    `SFO to LHR ${dep} to ${retStr} round trip economy`,
+                    `BOS to BCN ${dep} to ${retStr} round trip economy`,
+                    `SEA to ICN ${dep} to ${retStr} round trip economy`,
+                    `DEN to AMS ${dep} to ${retStr} round trip economy`,
+                    `DFW to CUN ${dep} to ${retStr} round trip economy`,
+                    `ATL to DUB ${dep} to ${retStr} round trip economy`,
+                  ];
+                  const pick = routes[Math.floor(Math.random() * routes.length)]!;
+                  setQuery(pick);
+                  doParse(pick, []);
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22M22 6l-4-4M22 6l-4 4M2 6h1.4c1.3 0 2.5.6 3.3 1.7l6.1 8.6c.7 1.1 2 1.7 3.3 1.7H22M22 18l-4-4M22 18l-4 4" />
+                </svg>
+                Try a random flight
+              </button>
+              <button
+                type="button"
+                className={styles.manualToggle}
+                onClick={() => setManualMode(true)}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                Enter flight details manually
+              </button>
+            </>
+          )}
+        </>
       )}
 
       {error && (
