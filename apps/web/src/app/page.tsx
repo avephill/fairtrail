@@ -70,6 +70,14 @@ export default async function HomePage() {
         <p className={styles.tagline}>
           The price trail airlines don&apos;t show you
         </p>
+        {!isSelfHosted && (
+          <a href="https://github.com/affromero/fairtrail" target="_blank" rel="noopener noreferrer" className={styles.githubLink}>
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+            </svg>
+            View on GitHub
+          </a>
+        )}
         {isSelfHosted ? (
           <>
             <SearchBar />
@@ -79,7 +87,74 @@ export default async function HomePage() {
             <UsageStats />
           </>
         ) : (
-          <InstallCommand />
+          <>
+            <InstallCommand />
+            <div className={styles.providers}>
+              <h2 className={styles.providersTitle}>Bring your own LLM</h2>
+              <div className={styles.providerGrid}>
+                <div className={`${styles.providerCard} ${styles.providerFree}`}>
+                  <span className={styles.providerName}>Claude Code</span>
+                  <span className={styles.providerTag}>Free with Max</span>
+                </div>
+                <div className={`${styles.providerCard} ${styles.providerFree}`}>
+                  <span className={styles.providerName}>Codex CLI</span>
+                  <span className={styles.providerTag}>Free with Pro</span>
+                </div>
+                <div className={`${styles.providerCard} ${styles.providerLocal}`}>
+                  <span className={styles.providerName}>Ollama</span>
+                  <span className={styles.providerTag}>Local</span>
+                </div>
+                <div className={`${styles.providerCard} ${styles.providerLocal}`}>
+                  <span className={styles.providerName}>llama.cpp</span>
+                  <span className={styles.providerTag}>Local</span>
+                </div>
+                <div className={`${styles.providerCard} ${styles.providerLocal}`}>
+                  <span className={styles.providerName}>vLLM</span>
+                  <span className={styles.providerTag}>Local GPU</span>
+                </div>
+                <div className={styles.providerCard}>
+                  <span className={styles.providerName}>Anthropic</span>
+                  <span className={styles.providerTag}>API key</span>
+                </div>
+                <div className={styles.providerCard}>
+                  <span className={styles.providerName}>OpenAI</span>
+                  <span className={styles.providerTag}>API key</span>
+                </div>
+                <div className={styles.providerCard}>
+                  <span className={styles.providerName}>Google AI</span>
+                  <span className={styles.providerTag}>API key</span>
+                </div>
+              </div>
+              <p className={styles.providersHint}>
+                Auto-detected during install. Zero config for CLI subscriptions.
+              </p>
+            </div>
+
+            <div className={styles.providers}>
+              <h2 className={styles.providersTitle}>VPN Price Comparison</h2>
+              <div className={styles.vpnGrid}>
+                <div className={`${styles.providerCard} ${styles.providerFree}`}>
+                  <span className={styles.providerName}>ExpressVPN</span>
+                  <span className={styles.providerTag}>Supported</span>
+                </div>
+                <div className={styles.providerCard}>
+                  <span className={styles.providerName}>NordVPN</span>
+                  <span className={styles.providerTag}>Coming soon</span>
+                </div>
+                <div className={styles.providerCard}>
+                  <span className={styles.providerName}>Mullvad</span>
+                  <span className={styles.providerTag}>Coming soon</span>
+                </div>
+                <div className={styles.providerCard}>
+                  <span className={styles.providerName}>Custom Proxy</span>
+                  <span className={styles.providerTag}>Coming soon</span>
+                </div>
+              </div>
+              <p className={styles.providersHint}>
+                Test the myth: do flight prices change when you browse from different countries?
+              </p>
+            </div>
+          </>
         )}
       </div>
 
