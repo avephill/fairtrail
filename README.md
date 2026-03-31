@@ -111,11 +111,8 @@ Changing your IP is not enough. Websites detect mismatches between your IP and b
 
 ### Setup
 
-1. Go to **Settings** and paste your [ExpressVPN activation code](https://www.expressvpn.com/setup) (encrypted before storage)
-2. Start Fairtrail with VPN support:
-   ```bash
-   docker compose -f docker-compose.prod.yml -f docker-compose.vpn.yml up -d
-   ```
+1. During install, say **yes** to "Set up ExpressVPN?" and paste your [activation code](https://www.expressvpn.com/setup) -- or paste it later in **Settings**
+2. The VPN sidecar starts automatically with Fairtrail (no extra commands needed)
 3. When creating a new tracker, toggle **"Compare prices from different countries"** and pick which countries to compare
 4. Each scrape run: local baseline first, then each VPN country sequentially
 5. On the chart page, use the **view filter** to switch between:

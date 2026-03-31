@@ -580,6 +580,8 @@ services:
       expressvpn:
         condition: service_healthy
 VPNYAML
+    # Set COMPOSE_FILE so docker compose auto-includes vpn sidecar
+    export COMPOSE_FILE="docker-compose.yml:docker-compose.vpn.yml"
     ok "VPN configured — sidecar will start automatically"
   else
     printf "  ${DIM}Skipped (no code entered)${RESET}\n"
