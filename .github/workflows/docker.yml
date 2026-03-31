@@ -1,4 +1,4 @@
-name: Docker
+name: Docker ARM64
 
 on:
   workflow_run:
@@ -11,17 +11,9 @@ env:
   IMAGE_NAME: affromero/fairtrail
 
 jobs:
-  build:
+  build-arm64:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            platform: linux/amd64
-          - runner: ubuntu-24.04-arm
-            platform: linux/arm64
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
       packages: write
@@ -38,66 +30,65 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push by digest
+      - name: Build and push arm64 by digest
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: ${{ matrix.platform }}
+          platforms: linux/arm64
           build-args: |
             COMMIT_SHA=${{ github.event.workflow_run.head_sha }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
         run: |
-          mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: digest-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
-
-  merge:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          echo "arm64_digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "ARM64 digest: $digest"
+        id: digest
 
       - name: Get version
         id: version
         run: echo "version=$(node -p "require('./apps/web/package.json').version")" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@v3
+      - name: Get existing amd64 digest
+        id: amd64
+        run: |
+          # Get the amd64 digest from the existing :latest image (pushed by /deploy-fairtrail)
+          amd64_digest=$(docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest --raw 2>/dev/null \
+            | jq -r '.manifests[] | select(.platform.architecture=="amd64") | .digest' 2>/dev/null || echo "")
 
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          if [ -z "$amd64_digest" ]; then
+            # No existing multi-arch manifest -- use :latest as a single-arch amd64 image
+            amd64_digest=$(docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest --raw 2>/dev/null \
+              | jq -r '.digest // empty' 2>/dev/null || echo "")
+          fi
 
-      - uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          pattern: digest-*
-          merge-multiple: true
+          if [ -z "$amd64_digest" ]; then
+            echo "No existing amd64 image found -- pushing arm64-only manifest"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Found amd64 digest: $amd64_digest"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "digest=$amd64_digest" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create multi-arch manifest
-        working-directory: /tmp/digests
         run: |
-          docker buildx imagetools create \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.workflow_run.head_sha }} \
-            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+          if [ "${{ steps.amd64.outputs.found }}" = "true" ]; then
+            echo "Merging amd64 + arm64 into multi-arch manifest"
+            docker buildx imagetools create \
+              -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+              -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.amd64.outputs.digest }} \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digest.outputs.arm64_digest }}
+          else
+            echo "No amd64 image -- tagging arm64-only"
+            docker buildx imagetools create \
+              -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+              -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digest.outputs.arm64_digest }}
+          fi
 
       - name: Verify manifest
         run: |
