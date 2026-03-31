@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.1] - 2026-03-31
+
+### Added
+- **Manual flight entry form**: bypass LLM parsing by entering airport codes, dates, and trip type directly (#37)
+- Collapsible advanced options (flexibility, max price, stops, cabin class, time preference, currency, airlines)
+- Custom select dropdown styling, focus-visible keyboard ring, mobile responsive layout
+
+### Fixed
+- Same-day round trips now rejected (API requires return after departure)
+- Same origin and destination airport blocked in validation
+- Date validation uses local timezone instead of UTC
+- Stale error/clarification UI cleared when entering manual mode
+- VPN country selections reset on search reset
+- Anti-detection init script verification in tests
+- Browser smoke test updated for settings page layout
+
 ## [0.4.0] - 2026-03-30
 
 ### Added
