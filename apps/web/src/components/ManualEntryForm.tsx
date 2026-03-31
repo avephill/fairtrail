@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ParsedQuery } from './ConfirmationCard';
+import { AirportCombobox } from './AirportCombobox';
 import { detectLocaleCurrency } from '@/lib/currency';
 import styles from './ManualEntryForm.module.css';
 
@@ -11,17 +12,20 @@ interface ManualEntryFormProps {
   adminCurrency: string | null;
 }
 
+interface SelectedAirport {
+  code: string;
+  name: string;
+}
+
 function synthesizeRawInput(
-  originCode: string,
-  originName: string,
-  destCode: string,
-  destName: string,
+  origin: SelectedAirport,
+  destination: SelectedAirport,
   dateFrom: string,
   dateTo: string,
   tripType: 'one_way' | 'round_trip',
   cabinClass: string,
 ): string {
-  const parts = [`${originCode} ${originName} to ${destCode} ${destName}`];
+  const parts = [`${origin.code} ${origin.name} to ${destination.code} ${destination.name}`];
   parts.push(dateFrom);
   if (tripType === 'round_trip' && dateTo) {
     parts.push(`to ${dateTo}`);
@@ -34,10 +38,8 @@ function synthesizeRawInput(
 }
 
 export function ManualEntryForm({ onSubmit, onCancel, adminCurrency }: ManualEntryFormProps) {
-  const [originCode, setOriginCode] = useState('');
-  const [originName, setOriginName] = useState('');
-  const [destCode, setDestCode] = useState('');
-  const [destName, setDestName] = useState('');
+  const [origin, setOrigin] = useState<SelectedAirport | null>(null);
+  const [destination, setDestination] = useState<SelectedAirport | null>(null);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [tripType, setTripType] = useState<'one_way' | 'round_trip'>('round_trip');
@@ -63,14 +65,12 @@ export function ManualEntryForm({ onSubmit, onCancel, adminCurrency }: ManualEnt
 
   const validate = (): Record<string, string> | null => {
     const errors: Record<string, string> = {};
-    const code = originCode.trim();
-    const dest = destCode.trim();
 
-    if (!/^[A-Z]{3}$/.test(code)) errors.originCode = 'Enter a 3-letter IATA code';
-    if (!originName.trim()) errors.originName = 'Enter airport or city name';
-    if (!/^[A-Z]{3}$/.test(dest)) errors.destCode = 'Enter a 3-letter IATA code';
-    else if (code && code === dest) errors.destCode = 'Must differ from origin';
-    if (!destName.trim()) errors.destName = 'Enter airport or city name';
+    if (!origin) errors.origin = 'Select an origin airport';
+    if (!destination) errors.destination = 'Select a destination airport';
+    if (origin && destination && origin.code === destination.code) {
+      errors.destination = 'Must differ from origin';
+    }
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     if (!dateFrom) {
@@ -97,18 +97,16 @@ export function ManualEntryForm({ onSubmit, onCancel, adminCurrency }: ManualEnt
       return;
     }
 
-    const code = originCode.trim();
-    const dest = destCode.trim();
-    const oName = originName.trim();
-    const dName = destName.trim();
+    const o = origin!;
+    const d = destination!;
 
     const query: ParsedQuery = {
-      origin: code,
-      originName: oName,
-      destination: dest,
-      destinationName: dName,
-      origins: [{ code, name: oName }],
-      destinations: [{ code: dest, name: dName }],
+      origin: o.code,
+      originName: o.name,
+      destination: d.code,
+      destinationName: d.name,
+      origins: [{ code: o.code, name: o.name }],
+      destinations: [{ code: d.code, name: d.name }],
       dateFrom,
       dateTo: tripType === 'round_trip' ? dateTo : dateFrom,
       flexibility,
@@ -131,7 +129,7 @@ export function ManualEntryForm({ onSubmit, onCancel, adminCurrency }: ManualEnt
       query.dateTo = to.toISOString().split('T')[0]!;
     }
 
-    const rawInput = synthesizeRawInput(code, oName, dest, dName, dateFrom, dateTo, tripType, cabinClass);
+    const rawInput = synthesizeRawInput(o, d, dateFrom, dateTo, tripType, cabinClass);
     onSubmit(query, rawInput);
   };
 
@@ -140,72 +138,26 @@ export function ManualEntryForm({ onSubmit, onCancel, adminCurrency }: ManualEnt
 
   return (
     <form className={styles.root} onSubmit={handleSubmit} noValidate>
-      <div className={styles.sectionLabel}>Origin</div>
-      <div className={styles.fieldRow}>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="me-origin-code">IATA Code</label>
-          <input
-            id="me-origin-code"
-            className={`${styles.input} ${fieldErrors.originCode ? styles.inputError : ''}`}
-            type="text"
-            placeholder="JFK"
-            maxLength={3}
-            value={originCode}
-            onChange={(e) => { setOriginCode(e.target.value.toUpperCase()); clearError('originCode'); }}
-            autoFocus
-            aria-required
-            aria-invalid={!!fieldErrors.originCode}
-          />
-          {fieldErrors.originCode && <span className={styles.errorText}>{fieldErrors.originCode}</span>}
-        </div>
-        <div className={`${styles.field} ${styles.fieldGrow}`}>
-          <label className={styles.label} htmlFor="me-origin-name">City / Airport</label>
-          <input
-            id="me-origin-name"
-            className={`${styles.input} ${fieldErrors.originName ? styles.inputError : ''}`}
-            type="text"
-            placeholder="New York JFK"
-            value={originName}
-            onChange={(e) => { setOriginName(e.target.value); clearError('originName'); }}
-            aria-required
-            aria-invalid={!!fieldErrors.originName}
-          />
-          {fieldErrors.originName && <span className={styles.errorText}>{fieldErrors.originName}</span>}
-        </div>
-      </div>
+      <AirportCombobox
+        id="me-origin"
+        label="Origin"
+        placeholder="Search by city, airport, or code (e.g. JFK)"
+        value={origin}
+        onChange={(v) => { setOrigin(v); clearError('origin'); }}
+        error={fieldErrors.origin}
+        excludeCode={destination?.code}
+        autoFocus
+      />
 
-      <div className={styles.sectionLabel}>Destination</div>
-      <div className={styles.fieldRow}>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="me-dest-code">IATA Code</label>
-          <input
-            id="me-dest-code"
-            className={`${styles.input} ${fieldErrors.destCode ? styles.inputError : ''}`}
-            type="text"
-            placeholder="CDG"
-            maxLength={3}
-            value={destCode}
-            onChange={(e) => { setDestCode(e.target.value.toUpperCase()); clearError('destCode'); }}
-            aria-required
-            aria-invalid={!!fieldErrors.destCode}
-          />
-          {fieldErrors.destCode && <span className={styles.errorText}>{fieldErrors.destCode}</span>}
-        </div>
-        <div className={`${styles.field} ${styles.fieldGrow}`}>
-          <label className={styles.label} htmlFor="me-dest-name">City / Airport</label>
-          <input
-            id="me-dest-name"
-            className={`${styles.input} ${fieldErrors.destName ? styles.inputError : ''}`}
-            type="text"
-            placeholder="Paris CDG"
-            value={destName}
-            onChange={(e) => { setDestName(e.target.value); clearError('destName'); }}
-            aria-required
-            aria-invalid={!!fieldErrors.destName}
-          />
-          {fieldErrors.destName && <span className={styles.errorText}>{fieldErrors.destName}</span>}
-        </div>
-      </div>
+      <AirportCombobox
+        id="me-dest"
+        label="Destination"
+        placeholder="Search by city, airport, or code (e.g. CDG)"
+        value={destination}
+        onChange={(v) => { setDestination(v); clearError('destination'); }}
+        error={fieldErrors.destination}
+        excludeCode={origin?.code}
+      />
 
       <div className={styles.tripToggle}>
         <button
