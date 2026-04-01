@@ -52,6 +52,12 @@ export async function PATCH(request: NextRequest) {
   if (typeof body.scrapeIntervalHours === 'number') {
     data.scrapeInterval = Math.max(1, Math.min(24, Math.round(body.scrapeIntervalHours)));
   }
+  if (body.defaultSearchMethod !== undefined) {
+    if (body.defaultSearchMethod !== 'ai' && body.defaultSearchMethod !== 'manual') {
+      return apiError('defaultSearchMethod must be "ai" or "manual"', 400);
+    }
+    data.defaultSearchMethod = body.defaultSearchMethod;
+  }
   if (typeof body.adminPassword === 'string' && body.adminPassword.length > 0) {
     data.adminPasswordHash = await hashPassword(body.adminPassword);
   }

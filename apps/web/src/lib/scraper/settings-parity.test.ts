@@ -101,24 +101,28 @@ describe('settings page parity with admin config', () => {
     }
   });
 
-  it('API PATCH handler accepts defaultCurrency and defaultCountry', () => {
+  it('API PATCH handler accepts defaultCurrency, defaultCountry, and defaultSearchMethod', () => {
     const apiFields = extractApiPatchFields(CONFIG_API);
 
     expect(apiFields).toContain('defaultCurrency');
     expect(apiFields).toContain('defaultCountry');
+    expect(apiFields).toContain('defaultSearchMethod');
   });
 
-  it('settings page has useState hooks for defaultCurrency and defaultCountry', () => {
+  it('settings page has useState hooks for defaultCurrency, defaultCountry, and defaultSearchMethod', () => {
     expect(SETTINGS_PAGE).toContain("const [defaultCurrency, setDefaultCurrency]");
     expect(SETTINGS_PAGE).toContain("const [defaultCountry, setDefaultCountry]");
+    expect(SETTINGS_PAGE).toContain("const [defaultSearchMethod, setDefaultSearchMethod]");
   });
 
-  it('settings useEffect populates defaultCurrency and defaultCountry from API', () => {
+  it('settings useEffect populates defaultCurrency, defaultCountry, and defaultSearchMethod from API', () => {
     expect(SETTINGS_PAGE).toContain('setDefaultCurrency(');
     expect(SETTINGS_PAGE).toContain('setDefaultCountry(');
+    expect(SETTINGS_PAGE).toContain('setDefaultSearchMethod(');
   });
 
-  it('settings page renders currency selector', () => {
+  it('settings page renders currency selector and search method selector', () => {
     expect(SETTINGS_PAGE).toContain('Default Currency');
+    expect(SETTINGS_PAGE).toContain('Default Search Method');
   });
 });

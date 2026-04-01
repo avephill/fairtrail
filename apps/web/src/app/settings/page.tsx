@@ -15,6 +15,7 @@ interface Config {
   customBaseUrl: string | null;
   defaultCurrency: string | null;
   defaultCountry: string | null;
+  defaultSearchMethod: 'ai' | 'manual';
   vpnProvider: string | null;
   vpnCountries: string[];
   hasVpnActivationCode: boolean;
@@ -29,6 +30,7 @@ export default function SettingsPage() {
   const [customBaseUrl, setCustomBaseUrl] = useState('');
   const [defaultCurrency, setDefaultCurrency] = useState('');
   const [defaultCountry, setDefaultCountry] = useState('');
+  const [defaultSearchMethod, setDefaultSearchMethod] = useState<'ai' | 'manual'>('ai');
   const [vpnProvider, setVpnProvider] = useState('none');
   const [vpnCountries, setVpnCountries] = useState<string[]>([]);
   const [vpnActivationCode, setVpnActivationCode] = useState('');
@@ -94,6 +96,7 @@ export default function SettingsPage() {
           setCustomBaseUrl(d.data.customBaseUrl || '');
           setDefaultCurrency(d.data.defaultCurrency || '');
           setDefaultCountry(d.data.defaultCountry || '');
+          setDefaultSearchMethod(d.data.defaultSearchMethod === 'manual' ? 'manual' : 'ai');
           setVpnProvider(d.data.vpnProvider || 'none');
           setVpnCountries(d.data.vpnCountries || []);
           setHasVpnCode(d.data.hasVpnActivationCode || false);
@@ -147,6 +150,7 @@ export default function SettingsPage() {
         customBaseUrl: customBaseUrl.trim() || null,
         defaultCurrency: defaultCurrency.trim().toUpperCase() || null,
         defaultCountry: defaultCountry.trim().toUpperCase() || null,
+        defaultSearchMethod,
         vpnProvider: vpnProvider === 'none' ? null : vpnProvider,
         vpnCountries,
       }),
@@ -406,6 +410,21 @@ export default function SettingsPage() {
                 maxLength={3}
               />
             )}
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Default Search Method</label>
+            <select
+              className={styles.select}
+              value={defaultSearchMethod}
+              onChange={(e) => setDefaultSearchMethod(e.target.value as 'ai' | 'manual')}
+            >
+              <option value="ai">AI natural language search</option>
+              <option value="manual">Manual input form</option>
+            </select>
+            <span className={styles.toggleHint}>
+              Controls which search flow opens first on the home page for this Fairtrail instance.
+            </span>
           </div>
 
           <div className={styles.actions}>

@@ -97,6 +97,7 @@ model ExtractionConfig {
   model                String    @default("claude-haiku-4-5-20251001")
   enabled              Boolean   @default(true)
   scrapeInterval       Int       @default(3) // hours — global default
+  defaultSearchMethod  String    @default("ai") // 'ai' | 'manual'
   adminPasswordHash    String?
   communitySharing     Boolean   @default(false)
   communityApiKey      String?

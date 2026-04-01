@@ -45,7 +45,13 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
   useEffect(() => {
     fetch('/api/admin/config')
       .then((r) => r.json())
-      .then((d) => { if (d.ok && d.data.defaultCurrency) setAdminCurrency(d.data.defaultCurrency); })
+      .then((d) => {
+        if (!d.ok) return;
+        if (d.data.defaultCurrency) setAdminCurrency(d.data.defaultCurrency);
+        const searchMethod = d.data.defaultSearchMethod === 'manual' ? 'manual' : 'ai';
+        setActiveSearchMethod(searchMethod);
+        setManualMode(searchMethod === 'manual');
+      })
       .catch(() => {});
   }, []);
 
@@ -68,6 +74,7 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
   const [createdTrackers, setCreatedTrackers] = useState<CreatedTracker[] | null>(null);
 
   // Manual entry mode
+  const [activeSearchMethod, setActiveSearchMethod] = useState<'ai' | 'manual'>('ai');
   const [manualMode, setManualMode] = useState(false);
   const [manualRawInput, setManualRawInput] = useState('');
 
@@ -272,7 +279,7 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
     setPreviewRoutes(null);
     setPreviewLoading(false);
     setCreatedTrackers(null);
-    setManualMode(false);
+    setManualMode(activeSearchMethod === 'manual');
     setManualRawInput('');
     setVpnCountries([]);
     inputRef.current?.focus();
@@ -292,8 +299,12 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
             setManualRawInput(rawInput);
             setManualMode(false);
           }}
-          onCancel={() => setManualMode(false)}
+          onCancel={() => {
+            setActiveSearchMethod('ai');
+            setManualMode(false);
+          }}
           adminCurrency={adminCurrency}
+          cancelLabel="Use AI search"
         />
       ) : (
         <>
@@ -381,6 +392,7 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
                   setError(null);
                   setAmbiguities([]);
                   setPartialParsed(null);
+                  setActiveSearchMethod('manual');
                   setManualMode(true);
                 }}
               >

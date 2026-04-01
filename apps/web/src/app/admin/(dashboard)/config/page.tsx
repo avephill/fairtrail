@@ -14,6 +14,7 @@ interface Config {
   communityApiKey: string | null;
   defaultCurrency: string | null;
   defaultCountry: string | null;
+  defaultSearchMethod: 'ai' | 'manual';
   customBaseUrl: string | null;
   vpnProvider: string | null;
   vpnCountries: string[];
@@ -30,6 +31,7 @@ export default function ConfigPage() {
   const [scrapeInterval, setScrapeInterval] = useState(3);
   const [defaultCurrency, setDefaultCurrency] = useState('');
   const [defaultCountry, setDefaultCountry] = useState('');
+  const [defaultSearchMethod, setDefaultSearchMethod] = useState<'ai' | 'manual'>('ai');
   const [customBaseUrl, setCustomBaseUrl] = useState('');
   const [vpnProvider, setVpnProvider] = useState('none');
   const [vpnCountries, setVpnCountries] = useState<string[]>([]);
@@ -80,6 +82,7 @@ export default function ConfigPage() {
           setScrapeInterval(d.data.scrapeInterval);
           setDefaultCurrency(d.data.defaultCurrency || '');
           setDefaultCountry(d.data.defaultCountry || '');
+          setDefaultSearchMethod(d.data.defaultSearchMethod === 'manual' ? 'manual' : 'ai');
           setCustomBaseUrl(d.data.customBaseUrl || '');
           setVpnProvider(d.data.vpnProvider || 'none');
           setVpnCountries(d.data.vpnCountries || []);
@@ -133,6 +136,7 @@ export default function ConfigPage() {
         scrapeIntervalHours: scrapeInterval,
         defaultCurrency: defaultCurrency.trim().toUpperCase() || null,
         defaultCountry: defaultCountry.trim().toUpperCase() || null,
+        defaultSearchMethod,
         customBaseUrl: newBaseUrl,
         vpnProvider: vpnProvider === 'none' ? null : vpnProvider,
         vpnCountries,
@@ -297,6 +301,18 @@ export default function ConfigPage() {
             onChange={(e) => setDefaultCountry(e.target.value.toUpperCase())}
             maxLength={2}
           />
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Default Search Method</label>
+          <select
+            className={styles.select}
+            value={defaultSearchMethod}
+            onChange={(e) => setDefaultSearchMethod(e.target.value as 'ai' | 'manual')}
+          >
+            <option value="ai">AI natural language search</option>
+            <option value="manual">Manual input form</option>
+          </select>
         </div>
 
         <div className={styles.field}>
