@@ -2,22 +2,26 @@
 
 import { useEffect, useState } from 'react';
 import styles from './ThemeToggle.module.css';
-import { applyTheme, getNextToggleTheme, getThemeFromDom, getThemeMode, type ThemeId } from '@/lib/theme';
+import { applyTheme, getNextToggleTheme, getThemeFromDom, getThemeMode, isLightTheme, type ThemeId } from '@/lib/theme';
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState<ThemeId>('default');
+  const [lastDarkTheme, setLastDarkTheme] = useState<ThemeId>('default');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const resolved = getThemeFromDom();
     setTheme(resolved);
+    setLastDarkTheme(isLightTheme(resolved) ? 'default' : resolved);
     applyTheme(resolved);
   }, []);
 
   const toggle = async () => {
     if (saving) return;
-    const next: ThemeId = getNextToggleTheme(theme);
+    const next: ThemeId = getNextToggleTheme(theme, lastDarkTheme);
+    const nextDarkTheme = isLightTheme(theme) ? next : theme;
     setTheme(next);
+    setLastDarkTheme(nextDarkTheme);
     applyTheme(next);
     setSaving(true);
 
@@ -30,10 +34,12 @@ export function ThemeToggle() {
       const data = await res.json();
       if (!data.ok) {
         setTheme(theme);
+        setLastDarkTheme(lastDarkTheme);
         applyTheme(theme);
       }
     } catch {
       setTheme(theme);
+      setLastDarkTheme(lastDarkTheme);
       applyTheme(theme);
     } finally {
       setSaving(false);

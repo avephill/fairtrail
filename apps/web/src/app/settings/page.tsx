@@ -194,7 +194,7 @@ export default function SettingsPage() {
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Appearance</h2>
           <p className={styles.toggleHint}>
-            Pick the interface theme you want Fairtrail to use on this device.
+            Pick the interface theme Fairtrail should use across this instance for all users and browsers.
           </p>
 
           <div className={styles.themeGrid}>

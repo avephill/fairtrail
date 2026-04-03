@@ -21,10 +21,6 @@ export function getThemeMode(theme: ThemeId): ThemeMode {
   return THEME_OPTIONS.find((option) => option.id === theme)?.mode ?? 'dark';
 }
 
-export function resolveInitialTheme(preferredLight: boolean): ThemeId {
-  return preferredLight ? 'basic-light' : 'default';
-}
-
 export function getThemeFromDom(): ThemeId {
   if (typeof document === 'undefined') return 'default';
   const current = document.documentElement.getAttribute('data-theme');
@@ -42,6 +38,10 @@ export function isLightTheme(theme: ThemeId) {
   return getThemeMode(theme) === 'light';
 }
 
-export function getNextToggleTheme(theme: ThemeId): ThemeId {
-  return getThemeMode(theme) === 'light' ? 'default' : 'basic-light';
+export function getNextToggleTheme(theme: ThemeId, previousDarkTheme: ThemeId = 'default'): ThemeId {
+  if (getThemeMode(theme) === 'light') {
+    return getThemeMode(previousDarkTheme) === 'dark' ? previousDarkTheme : 'default';
+  }
+
+  return 'basic-light';
 }
