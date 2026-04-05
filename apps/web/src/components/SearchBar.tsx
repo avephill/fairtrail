@@ -11,7 +11,7 @@ import { ClarificationCard } from './ClarificationCard';
 import { ConfirmationCard, type ParsedQuery } from './ConfirmationCard';
 import { FlightPicker, type RouteFlights } from './FlightPicker';
 import { LinkBanner, type CreatedTracker } from './LinkBanner';
-import { ManualEntryForm } from './ManualEntryForm';
+import { ManualEntryForm, type ManualFormValues } from './ManualEntryForm';
 
 const PREVIEW_STORAGE_KEY = 'ft-preview-run';
 const PREVIEW_POLL_TIMEOUT_MS = 5 * 60 * 1000;
@@ -103,6 +103,7 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
   const [activeSearchMethod, setActiveSearchMethod] = useState<'ai' | 'manual'>('ai');
   const [manualMode, setManualMode] = useState(false);
   const [manualRawInput, setManualRawInput] = useState('');
+  const [manualFormValues, setManualFormValues] = useState<ManualFormValues | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/config')
@@ -256,6 +257,8 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
     setPreviewRoutes(null);
     setPreviewRunId(null);
     setCreatedTrackers(null);
+    setManualRawInput('');
+    setManualFormValues(null);
     clearSavedPreview();
 
     await doParse(trimmed, []);
@@ -408,7 +411,7 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
     clearSavedPreview();
   };
 
-  const [editingValues, setEditingValues] = useState<ParsedQuery | null>(null);
+  const [editingValues, setEditingValues] = useState<ManualFormValues | null>(null);
 
   const handleReset = () => {
     setParsed(null);
@@ -422,6 +425,7 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
     setCreatedTrackers(null);
     setManualMode(activeSearchMethod === 'manual');
     setManualRawInput('');
+    setManualFormValues(null);
     setVpnCountries([]);
     setEditingValues(null);
     clearSavedPreview();
@@ -429,8 +433,7 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
   };
 
   const handleEdit = () => {
-    const wasManual = !!manualRawInput;
-    const currentParsed = parsed;
+    const wasManual = !!manualFormValues;
 
     setError(null);
     setConversation([]);
@@ -442,8 +445,8 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
     setCreatedTrackers(null);
     clearSavedPreview();
 
-    if (wasManual && currentParsed) {
-      setEditingValues(currentParsed);
+    if (wasManual) {
+      setEditingValues(manualFormValues);
       setParsed(null);
       setManualMode(true);
     } else {
@@ -462,9 +465,10 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
     <div className={styles.root}>
       {manualMode ? (
         <ManualEntryForm
-          onSubmit={(nextParsed, rawInput) => {
+          onSubmit={(nextParsed, rawInput, formValues) => {
             setParsed(nextParsed);
             setManualRawInput(rawInput);
+            setManualFormValues(formValues);
             setManualMode(false);
             setEditingValues(null);
           }}

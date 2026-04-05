@@ -6,12 +6,27 @@ import { AirportCombobox } from './AirportCombobox';
 import { detectLocaleCurrency } from '@/lib/currency';
 import styles from './ManualEntryForm.module.css';
 
+export interface ManualFormValues {
+  origin: { code: string; name: string } | null;
+  destination: { code: string; name: string } | null;
+  dateFrom: string;
+  dateTo: string;
+  tripType: 'one_way' | 'round_trip';
+  flexibility: number;
+  maxPrice: string;
+  maxStops: string;
+  airlines: string;
+  timePreference: 'any' | 'morning' | 'afternoon' | 'evening' | 'redeye';
+  cabinClass: 'economy' | 'premium_economy' | 'business' | 'first';
+  currency: string;
+}
+
 interface ManualEntryFormProps {
-  onSubmit: (query: ParsedQuery, rawInput: string) => void;
+  onSubmit: (query: ParsedQuery, rawInput: string, formValues: ManualFormValues) => void;
   onCancel: () => void;
   adminCurrency: string | null;
   cancelLabel?: string;
-  initialValues?: ParsedQuery;
+  initialValues?: ManualFormValues;
 }
 
 interface SelectedAirport {
@@ -47,38 +62,31 @@ export function ManualEntryForm({
   initialValues,
 }: ManualEntryFormProps) {
   const iv = initialValues;
-  const [origin, setOrigin] = useState<SelectedAirport | null>(
-    iv ? { code: iv.origin, name: iv.originName } : null,
-  );
-  const [destination, setDestination] = useState<SelectedAirport | null>(
-    iv ? { code: iv.destination, name: iv.destinationName } : null,
-  );
+  const [origin, setOrigin] = useState<SelectedAirport | null>(iv?.origin ?? null);
+  const [destination, setDestination] = useState<SelectedAirport | null>(iv?.destination ?? null);
   const [dateFrom, setDateFrom] = useState(iv?.dateFrom ?? '');
   const [dateTo, setDateTo] = useState(iv?.dateTo ?? '');
-  const [tripType, setTripType] = useState<'one_way' | 'round_trip'>(
-    (iv?.tripType as 'one_way' | 'round_trip') ?? 'round_trip',
-  );
+  const [tripType, setTripType] = useState<'one_way' | 'round_trip'>(iv?.tripType ?? 'round_trip');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const hasAdvancedInitial = iv ? !!(
     iv.flexibility > 0 ||
     iv.maxPrice ||
-    (iv.maxStops !== null && iv.maxStops !== undefined) ||
-    iv.preferredAirlines.length > 0 ||
+    iv.maxStops ||
+    iv.airlines ||
     iv.timePreference !== 'any' ||
-    iv.cabinClass !== 'economy' ||
-    iv.currency
+    iv.cabinClass !== 'economy'
   ) : false;
   const [showAdvanced, setShowAdvanced] = useState(hasAdvancedInitial);
   const [flexibility, setFlexibility] = useState(iv?.flexibility ?? 0);
-  const [maxPrice, setMaxPrice] = useState(iv?.maxPrice ? String(iv.maxPrice) : '');
-  const [maxStops, setMaxStops] = useState(iv?.maxStops !== null && iv?.maxStops !== undefined ? String(iv.maxStops) : '');
-  const [airlines, setAirlines] = useState(iv?.preferredAirlines?.join(', ') ?? '');
+  const [maxPrice, setMaxPrice] = useState(iv?.maxPrice ?? '');
+  const [maxStops, setMaxStops] = useState(iv?.maxStops ?? '');
+  const [airlines, setAirlines] = useState(iv?.airlines ?? '');
   const [timePreference, setTimePreference] = useState<'any' | 'morning' | 'afternoon' | 'evening' | 'redeye'>(
-    (iv?.timePreference as 'any' | 'morning' | 'afternoon' | 'evening' | 'redeye') ?? 'any',
+    iv?.timePreference ?? 'any',
   );
   const [cabinClass, setCabinClass] = useState<'economy' | 'premium_economy' | 'business' | 'first'>(
-    (iv?.cabinClass as 'economy' | 'premium_economy' | 'business' | 'first') ?? 'economy',
+    iv?.cabinClass ?? 'economy',
   );
   const [currency, setCurrency] = useState(iv?.currency ?? '');
 
@@ -156,7 +164,21 @@ export function ManualEntryForm({
     }
 
     const rawInput = synthesizeRawInput(o, d, dateFrom, dateTo, tripType, cabinClass);
-    onSubmit(query, rawInput);
+    const formValues: ManualFormValues = {
+      origin: o,
+      destination: d,
+      dateFrom,
+      dateTo: tripType === 'round_trip' ? dateTo : dateFrom,
+      tripType,
+      flexibility,
+      maxPrice,
+      maxStops,
+      airlines,
+      timePreference,
+      cabinClass,
+      currency,
+    };
+    onSubmit(query, rawInput, formValues);
   };
 
   const now = new Date();
