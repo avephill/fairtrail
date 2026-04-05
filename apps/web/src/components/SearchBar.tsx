@@ -11,7 +11,7 @@ import { ClarificationCard } from './ClarificationCard';
 import { ConfirmationCard, type ParsedQuery } from './ConfirmationCard';
 import { FlightPicker, type RouteFlights } from './FlightPicker';
 import { LinkBanner, type CreatedTracker } from './LinkBanner';
-import { ManualEntryForm } from './ManualEntryForm';
+import { ManualEntryForm, type ManualFormValues } from './ManualEntryForm';
 
 const PREVIEW_STORAGE_KEY = 'ft-preview-run';
 const PREVIEW_POLL_TIMEOUT_MS = 5 * 60 * 1000;
@@ -103,6 +103,7 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
   const [activeSearchMethod, setActiveSearchMethod] = useState<'ai' | 'manual'>('ai');
   const [manualMode, setManualMode] = useState(false);
   const [manualRawInput, setManualRawInput] = useState('');
+  const [manualFormValues, setManualFormValues] = useState<ManualFormValues | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/config')
@@ -256,6 +257,8 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
     setPreviewRoutes(null);
     setPreviewRunId(null);
     setCreatedTrackers(null);
+    setManualRawInput('');
+    setManualFormValues(null);
     clearSavedPreview();
 
     await doParse(trimmed, []);
@@ -408,6 +411,8 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
     clearSavedPreview();
   };
 
+  const [editingValues, setEditingValues] = useState<ManualFormValues | null>(null);
+
   const handleReset = () => {
     setParsed(null);
     setError(null);
@@ -420,9 +425,35 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
     setCreatedTrackers(null);
     setManualMode(activeSearchMethod === 'manual');
     setManualRawInput('');
+    setManualFormValues(null);
     setVpnCountries([]);
+    setEditingValues(null);
     clearSavedPreview();
     inputRef.current?.focus();
+  };
+
+  const handleEdit = () => {
+    const wasManual = !!manualFormValues;
+
+    setError(null);
+    setConversation([]);
+    setAmbiguities([]);
+    setPartialParsed(null);
+    setPreviewRoutes(null);
+    setPreviewLoading(false);
+    setPreviewRunId(null);
+    setCreatedTrackers(null);
+    clearSavedPreview();
+
+    if (wasManual) {
+      setEditingValues(manualFormValues);
+      setParsed(null);
+      setManualMode(true);
+    } else {
+      setParsed(null);
+      setEditingValues(null);
+      inputRef.current?.focus();
+    }
   };
 
   const showClarification = ambiguities.length > 0 && !parsed;
@@ -434,17 +465,21 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
     <div className={styles.root}>
       {manualMode ? (
         <ManualEntryForm
-          onSubmit={(nextParsed, rawInput) => {
+          onSubmit={(nextParsed, rawInput, formValues) => {
             setParsed(nextParsed);
             setManualRawInput(rawInput);
+            setManualFormValues(formValues);
             setManualMode(false);
+            setEditingValues(null);
           }}
           onCancel={() => {
             setActiveSearchMethod('ai');
             setManualMode(false);
+            setEditingValues(null);
           }}
           adminCurrency={adminCurrency}
           cancelLabel="Use AI search"
+          initialValues={editingValues ?? undefined}
         />
       ) : (
         <>
@@ -568,7 +603,7 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
         <ConfirmationCard
           parsed={parsed}
           onTrack={handlePreview}
-          onEdit={handleReset}
+          onEdit={handleEdit}
           loading={loading}
           vpnCountries={vpnCountries}
           onVpnCountriesChange={setVpnCountries}
@@ -591,7 +626,7 @@ export function SearchBar({ initialQuery }: { initialQuery?: string } = {}) {
           routes={previewRoutes}
           onTrack={handleTrackSelected}
           onBack={handleBackFromPicker}
-          onEdit={handleReset}
+          onEdit={handleEdit}
           loading={loading}
         />
       )}
