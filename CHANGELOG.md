@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.3] - 2026-04-15
+
+### Fixed
+- Cron scheduler now reads scrape interval from the database instead of a hardcoded env var -- user-configured intervals from Settings UI are respected immediately (#50, reported by @garrynutter)
+- `open` command gated behind Darwin check to prevent mime-type errors on Linux (#49)
+
+### Added
+- Tests for cron scheduler interval behavior (startup DB read, env var fallback, immediate reschedule on settings change)
+
 ## [0.4.2] - 2026-04-05
 
 ### Added
