@@ -5,6 +5,8 @@ on:
     workflows: [CI]
     types: [completed]
     branches: [main]
+  release:
+    types: [published]
 
 env:
   REGISTRY: ghcr.io
@@ -12,7 +14,7 @@ env:
 
 jobs:
   build:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'release' || github.event.workflow_run.conclusion == 'success' }}
     strategy:
       fail-fast: true
       matrix:
@@ -28,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: docker/setup-buildx-action@v3
 
@@ -45,7 +47,7 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           build-args: |
-            COMMIT_SHA=${{ github.event.workflow_run.head_sha }}
+            COMMIT_SHA=${{ github.event.workflow_run.head_sha || github.sha }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
@@ -70,7 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Get version
         id: version
@@ -92,11 +94,13 @@ jobs:
 
       - name: Create multi-arch manifest
         working-directory: /tmp/digests
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           docker buildx imagetools create \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.workflow_run.head_sha }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${HEAD_SHA} \
             $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
 
       - name: Verify manifest
