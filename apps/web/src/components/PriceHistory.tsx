@@ -1,3 +1,5 @@
+'use client';
+
 import { currencySymbol } from '@/lib/currency';
 import styles from './PriceHistory.module.css';
 
