@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { ParseAmbiguity, ParsedFlightQuery } from '@/lib/scraper/parse-query';
+import type { ParseAmbiguity, ParsedFlightQuery, ParseResponse } from '@/lib/scraper/parse-query';
 import type { PreviewRunStatusPayload } from '@/lib/preview-run';
 import type { PriceData } from '@/lib/scraper/extract-prices';
 import { detectLocaleCurrency } from '@/lib/currency';
 import { addSavedTracker } from '@/lib/tracker-storage';
+import { parseFairtrailApiJson, readFairtrailApiJson } from '@/lib/read-fairtrail-api-response';
 import styles from './SearchBar.module.css';
 import { ClarificationCard } from './ClarificationCard';
 import { ConfirmationCard, type ParsedQuery } from './ConfirmationCard';
@@ -14,7 +15,10 @@ import { LinkBanner, type CreatedTracker } from './LinkBanner';
 import { ManualEntryForm, type ManualFormValues } from './ManualEntryForm';
 
 const PREVIEW_STORAGE_KEY_BASE = 'ft-preview-run';
-const PREVIEW_POLL_TIMEOUT_MS = 5 * 60 * 1000;
+// Keep client polling window aligned with server-side preview stale timeout.
+const PREVIEW_POLL_TIMEOUT_MS = 10 * 60 * 1000;
+const PARSE_POLL_INTERVAL_MS = 1000;
+const PARSE_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
 function previewStorageKey(surface: SearchSurface): string {
   return surface === 'admin' ? `${PREVIEW_STORAGE_KEY_BASE}-admin` : PREVIEW_STORAGE_KEY_BASE;
@@ -157,14 +161,104 @@ export function SearchBar({
         }),
       });
 
-      const data = await res.json();
+      const rawPost = await res.text();
+      type ParsePostEnvelope = {
+        ok?: boolean;
+        data?: {
+          parseRunId?: string;
+          parsed?: ParsedFlightQuery | null;
+          confidence?: 'high' | 'medium' | 'low';
+          ambiguities?: ParseAmbiguity[];
+          dateSpanDays?: number;
+        };
+        error?: string;
+      };
+      const postParsed = parseFairtrailApiJson<ParsePostEnvelope>(rawPost, res.status);
+      if (!postParsed.ok) {
+        setError(postParsed.userMessage);
+        return false;
+      }
+      const postData = postParsed.json;
 
-      if (!data.ok) {
-        setError(data.error || 'Failed to parse query');
+      if (!postData.ok) {
+        setError(postData.error || 'Failed to parse query');
         return false;
       }
 
-      const { parsed: nextParsed, confidence, ambiguities: nextAmbiguities } = data.data;
+      const parseStartedAt = Date.now();
+      const postBody = postData.data;
+      if (!postBody) {
+        setError('Failed to parse query');
+        return false;
+      }
+
+      const asyncParseId = postBody.parseRunId;
+      let parseResult: ParseResponse | null = null;
+
+      if (asyncParseId) {
+        while (Date.now() - parseStartedAt < PARSE_POLL_TIMEOUT_MS) {
+          const pr = await fetch(`/api/parse/${asyncParseId}`, { cache: 'no-store' });
+          const rawPoll = await pr.text();
+          type ParsePollEnvelope = {
+            ok?: boolean;
+            data?: {
+              status?: string;
+              result?: {
+                parsed: ParsedFlightQuery | null;
+                confidence: 'high' | 'medium' | 'low';
+                ambiguities: ParseAmbiguity[];
+                dateSpanDays: number;
+              } | null;
+              error?: string | null;
+            };
+            error?: string;
+          };
+          const pollParsed = parseFairtrailApiJson<ParsePollEnvelope>(rawPoll, pr.status);
+          if (!pollParsed.ok) {
+            setError(pollParsed.userMessage);
+            return false;
+          }
+          const pollData = pollParsed.json;
+
+          if (!pollData.ok) {
+            setError(pollData.error || 'Failed to parse query');
+            return false;
+          }
+
+          const st = pollData.data?.status;
+          if (st === 'completed' && pollData.data?.result) {
+            parseResult = pollData.data.result;
+            break;
+          }
+          if (st === 'failed') {
+            setError(pollData.data?.error || 'Failed to parse query');
+            return false;
+          }
+
+          await new Promise((r) => setTimeout(r, PARSE_POLL_INTERVAL_MS));
+        }
+
+        if (!parseResult) {
+          setError('Parsing took too long. Try a smaller or faster model, or check that your LLM endpoint is healthy.');
+          return false;
+        }
+      } else if (
+        'confidence' in postBody &&
+        'ambiguities' in postBody &&
+        'dateSpanDays' in postBody
+      ) {
+        parseResult = postBody as unknown as ParseResponse;
+      } else {
+        setError('Failed to parse query');
+        return false;
+      }
+
+      if (!parseResult) {
+        setError('Failed to parse query');
+        return false;
+      }
+
+      const { parsed: nextParsed, confidence, ambiguities: nextAmbiguities } = parseResult;
 
       if (nextParsed && !nextParsed.currency) {
         nextParsed.currency = adminCurrency || detectLocaleCurrency();
@@ -202,10 +296,20 @@ export function SearchBar({
     const poll = async () => {
       try {
         const res = await fetch(`/api/preview/${previewRunId}`, { cache: 'no-store' });
-        const data = await res.json();
+        type PreviewPollEnvelope = { ok: boolean; data?: PreviewRunStatusPayload; error?: string };
+        const read = await readFairtrailApiJson<PreviewPollEnvelope>(res);
 
         if (cancelled) return;
 
+        if (!read.ok) {
+          setError(read.userMessage);
+          setPreviewLoading(false);
+          setPreviewRunId(null);
+          clearSavedPreview(storageKey);
+          return;
+        }
+
+        const data = read.json;
         if (!data.ok) {
           setError(data.error || 'Failed to search flights');
           setPreviewLoading(false);
@@ -305,15 +409,26 @@ export function SearchBar({
         body: JSON.stringify(parsed),
       });
 
-      const data = await res.json();
+      type PreviewStartEnvelope = {
+        ok: boolean;
+        data?: { previewRunId?: string; status?: string; expiresAt?: string };
+        error?: string;
+      };
+      const read = await readFairtrailApiJson<PreviewStartEnvelope>(res);
+      if (!read.ok) {
+        setError(read.userMessage);
+        setPreviewLoading(false);
+        return;
+      }
 
+      const data = read.json;
       if (!data.ok) {
         setError(data.error || 'Failed to search flights');
         setPreviewLoading(false);
         return;
       }
 
-      const nextPreviewRunId = data.data.previewRunId as string | undefined;
+      const nextPreviewRunId = data.data?.previewRunId as string | undefined;
       if (!nextPreviewRunId) {
         setError('Failed to start flight search');
         setPreviewLoading(false);
@@ -370,14 +485,7 @@ export function SearchBar({
         }),
       });
 
-      const data = await res.json();
-
-      if (!data.ok) {
-        setError(data.error || 'Failed to create tracker');
-        return;
-      }
-
-      const queries: Array<{
+      type CreatedQueryRow = {
         id: string;
         origin: string;
         originName: string;
@@ -386,7 +494,21 @@ export function SearchBar({
         date?: string;
         returnDate?: string;
         deleteToken: string;
-      }> = data.data.queries;
+      };
+      type QueriesCreateEnvelope = { ok: boolean; data?: { queries: CreatedQueryRow[] }; error?: string };
+      const read = await readFairtrailApiJson<QueriesCreateEnvelope>(res);
+      if (!read.ok) {
+        setError(read.userMessage);
+        return;
+      }
+
+      const data = read.json;
+      if (!data.ok || !data.data?.queries) {
+        setError(data.error || 'Failed to create tracker');
+        return;
+      }
+
+      const queries = data.data.queries;
 
       for (const trackedQuery of queries) {
         addSavedTracker({
