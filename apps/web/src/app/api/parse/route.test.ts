@@ -1,16 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const mockParseFlightQuery = vi.fn();
-
-vi.mock('@/lib/scraper/parse-query', () => ({
-  parseFlightQuery: (...args: unknown[]) => mockParseFlightQuery(...args),
+vi.mock('./parse-run-job', () => ({
+  executeParseRun: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    extractionConfig: { findFirst: vi.fn().mockResolvedValue(null) },
-    apiUsageLog: { create: vi.fn().mockResolvedValue({}) },
+    parseRun: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({
+        id: 'run_test_1',
+        status: 'pending',
+        expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+      }),
+    },
   },
 }));
 
@@ -18,6 +24,8 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }),
 }));
 
+import { prisma } from '@/lib/prisma';
+import { executeParseRun } from './parse-run-job';
 import { POST } from './route';
 
 function makeRequest(body: unknown): NextRequest {
@@ -30,7 +38,13 @@ function makeRequest(body: unknown): NextRequest {
 
 describe('POST /api/parse', () => {
   beforeEach(() => {
-    mockParseFlightQuery.mockReset();
+    vi.clearAllMocks();
+    vi.mocked(prisma.parseRun.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.parseRun.create).mockResolvedValue({
+      id: 'run_test_1',
+      status: 'pending',
+      expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+    } as never);
   });
 
   it('rejects missing query field with 400', async () => {
@@ -50,42 +64,28 @@ describe('POST /api/parse', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns parsed flight data on success', async () => {
-    const parseResponse = {
-      parsed: { origin: 'JFK', destination: 'LAX' },
-      confidence: 'high',
-      ambiguities: [],
-      dateSpanDays: 7,
-    };
-    mockParseFlightQuery.mockResolvedValue({
-      response: parseResponse,
-      usage: { inputTokens: 100, outputTokens: 50 },
-    });
-
+  it('returns 202 with parseRunId and schedules executeParseRun', async () => {
     const res = await POST(makeRequest({ query: 'JFK to LAX June 15-22' }));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.data.confidence).toBe('high');
+    expect(body.data.parseRunId).toBe('run_test_1');
+    expect(body.data.status).toBe('pending');
+    expect(prisma.parseRun.create).toHaveBeenCalled();
+    expect(executeParseRun).toHaveBeenCalledWith('run_test_1');
   });
 
-  it('returns 422 when parse throws', async () => {
-    mockParseFlightQuery.mockRejectedValue(new Error('LLM exploded'));
-    const res = await POST(makeRequest({ query: 'JFK to LAX June 15' }));
-    expect(res.status).toBe(422);
+  it('returns existing run when same query is already in flight', async () => {
+    vi.mocked(prisma.parseRun.findFirst).mockResolvedValue({
+      id: 'existing',
+      status: 'running',
+      expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+    } as never);
+
+    const res = await POST(makeRequest({ query: 'JFK to LAX June 15-22' }));
+    expect(res.status).toBe(202);
     const body = await res.json();
-    expect(body.error).toContain('LLM exploded');
-  });
-
-  it('logs api usage after successful parse', async () => {
-    mockParseFlightQuery.mockResolvedValue({
-      response: { parsed: null, confidence: 'low', ambiguities: [], dateSpanDays: 0 },
-      usage: { inputTokens: 100, outputTokens: 50 },
-    });
-
-    await POST(makeRequest({ query: 'JFK to LAX June 15' }));
-
-    const { prisma } = await import('@/lib/prisma');
-    expect(prisma.apiUsageLog.create).toHaveBeenCalled();
+    expect(body.data.parseRunId).toBe('existing');
+    expect(prisma.parseRun.create).not.toHaveBeenCalled();
   });
 });

@@ -1,10 +1,48 @@
+import { createHash } from 'crypto';
+import type { Prisma } from '@prisma/client';
 import { NextRequest } from 'next/server';
-import { apiSuccess, apiError } from '@/lib/api-response';
-import { parseFlightQuery } from '@/lib/scraper/parse-query';
+import { apiError, apiSuccess } from '@/lib/api-response';
+import type { ParseRunRequestPayload } from '@/lib/parse-run';
 import { prisma } from '@/lib/prisma';
+import { executeParseRun } from './parse-run-job';
+
+const PARSE_RUN_TTL_MS = 24 * 60 * 60 * 1000;
+const PARSE_ACTIVE_TIMEOUT_MS = 10 * 60 * 1000;
+const ACTIVE_PARSE_STATUSES = ['pending', 'running'] as const;
+const TERMINAL_PARSE_STATUSES = ['completed', 'failed'] as const;
+const PARSE_TIMEOUT_ERROR = 'Parse run timed out before completing';
+
+function buildParseQueryHash(rawInput: string, conversationHistory?: ParseRunRequestPayload['conversationHistory']): string {
+  return createHash('sha256')
+    .update(JSON.stringify({ query: rawInput, conversationHistory: conversationHistory ?? null }))
+    .digest('hex');
+}
+
+async function cleanupExpiredParseRuns(now = new Date()) {
+  await prisma.parseRun.deleteMany({
+    where: {
+      status: { in: [...TERMINAL_PARSE_STATUSES] },
+      expiresAt: { lt: now },
+    },
+  });
+}
+
+async function markStaleParseRunsFailed(queryHash?: string, now = new Date()) {
+  const staleBefore = new Date(now.getTime() - PARSE_ACTIVE_TIMEOUT_MS);
+  await prisma.parseRun.updateMany({
+    where: {
+      status: { in: [...ACTIVE_PARSE_STATUSES] },
+      updatedAt: { lt: staleBefore },
+      ...(queryHash ? { queryHash } : {}),
+    },
+    data: {
+      status: 'failed',
+      error: PARSE_TIMEOUT_ERROR,
+    },
+  });
+}
 
 export async function POST(request: NextRequest) {
-
   const body = await request.json().catch(() => null);
   if (!body?.query || typeof body.query !== 'string') {
     return apiError('Missing or invalid "query" field', 400);
@@ -16,29 +54,56 @@ export async function POST(request: NextRequest) {
   }
 
   const conversationHistory = Array.isArray(body.conversationHistory)
-    ? body.conversationHistory as Array<{ role: 'user' | 'assistant'; content: string }>
+    ? (body.conversationHistory as ParseRunRequestPayload['conversationHistory'])
     : undefined;
 
-  try {
-    const { response, usage } = await parseFlightQuery(rawInput, conversationHistory);
+  const queryHash = buildParseQueryHash(rawInput, conversationHistory);
+  const now = new Date();
 
-    // Log API usage for the parse call
-    const config = await prisma.extractionConfig.findFirst({ where: { id: 'singleton' } });
-    await prisma.apiUsageLog.create({
-      data: {
-        provider: config?.provider ?? 'anthropic',
-        model: config?.model ?? 'claude-haiku-4-5-20251001',
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        costUsd: 0,
-        operation: 'parse-query',
-        durationMs: 0,
+  await cleanupExpiredParseRuns(now);
+  await markStaleParseRunsFailed(queryHash, now);
+
+  const existingRun = await prisma.parseRun.findFirst({
+    where: {
+      queryHash,
+      status: { in: [...ACTIVE_PARSE_STATUSES] },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (existingRun) {
+    return apiSuccess(
+      {
+        parseRunId: existingRun.id,
+        status: existingRun.status,
+        expiresAt: existingRun.expiresAt.toISOString(),
       },
-    });
-
-    return apiSuccess(response);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Failed to parse query';
-    return apiError(msg, 422);
+      202,
+    );
   }
+
+  const requestPayload: ParseRunRequestPayload = {
+    query: rawInput,
+    ...(conversationHistory?.length ? { conversationHistory } : {}),
+  };
+
+  const parseRun = await prisma.parseRun.create({
+    data: {
+      queryHash,
+      status: 'pending',
+      requestPayload: requestPayload as unknown as Prisma.InputJsonValue,
+      expiresAt: new Date(now.getTime() + PARSE_RUN_TTL_MS),
+    },
+  });
+
+  void executeParseRun(parseRun.id);
+
+  return apiSuccess(
+    {
+      parseRunId: parseRun.id,
+      status: parseRun.status,
+      expiresAt: parseRun.expiresAt.toISOString(),
+    },
+    202,
+  );
 }
