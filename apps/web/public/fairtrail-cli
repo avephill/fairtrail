@@ -276,11 +276,48 @@ cmd_search() {
 
   printf "${CYAN}${BOLD}▸${RESET} Parsing: ${BOLD}%s${RESET}\n" "$input"
 
-  # Step 1: Parse natural language query
+  # Step 1: Parse natural language query (async API: POST returns 202 + parseRunId, then poll GET)
   local parse_res
   parse_res=$(curl -sf "http://localhost:${PORT}/api/parse" \
     -H 'Content-Type: application/json' \
-    -d "{\"query\": $(printf '%s' "$input" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}" 2>/dev/null)
+    -d "{\"query\": $(printf '%s' "$input" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}" 2>/dev/null | python3 -c "
+import json, sys, time, urllib.request
+port = int(\"${PORT:-3003}\")
+raw = sys.stdin.read().strip()
+if not raw:
+    sys.exit(1)
+d = json.loads(raw)
+if not d.get('ok'):
+    print(json.dumps({'ok': False, 'error': d.get('error', '')}))
+    sys.exit(0)
+data = d.get('data') or {}
+pid = data.get('parseRunId')
+if not pid:
+    print(raw)
+    sys.exit(0)
+deadline = time.time() + 600
+while time.time() < deadline:
+    req = urllib.request.Request('http://127.0.0.1:%d/api/parse/%s' % (port, pid))
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            inner = json.loads(r.read().decode())
+    except OSError:
+        time.sleep(1)
+        continue
+    if not inner.get('ok'):
+        print(json.dumps({'ok': False, 'error': inner.get('error', 'poll failed')}))
+        sys.exit(0)
+    st = (inner.get('data') or {}).get('status')
+    if st == 'completed' and (inner.get('data') or {}).get('result') is not None:
+        print(json.dumps({'ok': True, 'data': inner['data']['result']}))
+        sys.exit(0)
+    if st == 'failed':
+        err = (inner.get('data') or {}).get('error') or 'parse failed'
+        print(json.dumps({'ok': False, 'error': err}))
+        sys.exit(0)
+    time.sleep(1)
+print(json.dumps({'ok': False, 'error': 'parse timed out'}))
+" 2>/dev/null)
 
   if [ -z "$parse_res" ]; then
     printf "${RED}${BOLD}✗${RESET} Failed to reach Fairtrail API\n"
