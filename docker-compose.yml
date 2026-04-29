@@ -54,6 +54,7 @@ services:
       CHROME_PATH: /usr/bin/chromium-browser
       NODE_ENV: production
       SELF_HOSTED: "true"
+      TZ: ${TZ:-America/Los_Angeles}
     extra_hosts:
       # Podman users: host.containers.internal resolves automatically — no extra_hosts needed
       - "host.docker.internal:host-gateway"
