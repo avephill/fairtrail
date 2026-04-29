@@ -340,6 +340,9 @@ export async function runFullScrapeForQuery(queryId: string): Promise<ScrapeResu
 }
 
 export async function cleanupUnvisitedQueries(): Promise<number> {
+  // Legacy orphan cleanup for never-viewed trackers.
+  // New tracker creation sets firstViewedAt immediately, so this is expected
+  // to be mostly a no-op unless a create path failed before setting it.
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const result = await prisma.query.deleteMany({
     where: { firstViewedAt: null, createdAt: { lt: cutoff }, isSeed: false },

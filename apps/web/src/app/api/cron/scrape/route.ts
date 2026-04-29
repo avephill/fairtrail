@@ -10,7 +10,9 @@ export async function GET(request: NextRequest) {
     return apiError('Unauthorized', 401);
   }
 
-  // Clean up queries never visited within 24h
+  // Legacy safety cleanup: remove orphaned queries that were never viewed.
+  // Newly created trackers now set firstViewedAt immediately, so this should
+  // typically delete 0 rows unless a write failed mid-request.
   const deletedUnvisited = await cleanupUnvisitedQueries();
 
   let results;
