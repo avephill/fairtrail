@@ -44,16 +44,6 @@ function hasFilters(p: ParsedQuery): boolean {
   );
 }
 
-function computeExpiry(dateTo: string, flexibility: number): string {
-  const d = new Date(dateTo + 'T00:00:00');
-  d.setDate(d.getDate() + flexibility);
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
 const POPULAR_COUNTRIES = [
   { code: 'US', flag: '\u{1F1FA}\u{1F1F8}', name: 'US' },
   { code: 'GB', flag: '\u{1F1EC}\u{1F1E7}', name: 'UK' },
@@ -194,10 +184,8 @@ export function ConfirmationCard({
         )}
 
         <div className={styles.expiry}>
-          <span className={styles.label}>Link expires</span>
-          <span className={styles.value}>
-            {computeExpiry(parsed.dateTo, parsed.flexibility)}
-          </span>
+          <span className={styles.label}>Tracker status</span>
+          <span className={styles.value}>Active until manually disabled</span>
         </div>
       </div>
 
@@ -206,7 +194,7 @@ export function ConfirmationCard({
           <circle cx="12" cy="12" r="10" />
           <path d="M12 6v6l4 2" />
         </svg>
-        Prices checked daily &middot; Shareable chart &middot; Tracking ends {computeExpiry(parsed.dateTo, parsed.flexibility)}
+        Prices checked daily &middot; Shareable chart &middot; Tracking continues until disabled
       </p>
 
       {hasFilters(parsed) && (

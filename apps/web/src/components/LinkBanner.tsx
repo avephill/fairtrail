@@ -118,7 +118,7 @@ export function LinkBanner({ trackers, onDismiss }: LinkBannerProps) {
           </svg>
           <div>
             <p className={styles.warningBold}>Save {isSingle ? 'this link' : 'these links'}! {isSingle ? "It's" : "They're"} the only way to access your {isSingle ? 'tracker' : 'trackers'}.</p>
-            <p className={styles.warningText}>If you don&apos;t visit within 24 hours, {isSingle ? 'it' : 'they'} will be automatically deleted.</p>
+            <p className={styles.warningText}>Tracking stays active until you manually disable or delete {isSingle ? 'it' : 'them'}.</p>
           </div>
         </div>
 

@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
   }
 
   const flex = Math.max(0, Math.min(Number(flexibility) || 0, 14));
-  const expiresAt = new Date(to);
-  expiresAt.setDate(expiresAt.getDate() + flex);
+  // Self-hosted default: keep trackers active until manually disabled/deleted.
+  const manualTrackingExpiry = new Date('2099-12-31T23:59:59.999Z');
 
   const airlines: string[] = Array.isArray(preferredAirlines) ? preferredAirlines : [];
   const groupId = crypto.randomUUID();
@@ -119,8 +119,7 @@ export async function POST(request: NextRequest) {
     const routeFrom = route.date ? new Date(route.date + 'T00:00:00Z') : from;
     const routeTo = route.returnDate ? new Date(route.returnDate + 'T00:00:00Z') : (route.date ? new Date(route.date + 'T00:00:00Z') : to);
     const routeFlex = route.date ? 0 : flex;
-    const routeExpiry = new Date(routeTo);
-    routeExpiry.setDate(routeExpiry.getDate() + routeFlex);
+    const routeExpiry = new Date(manualTrackingExpiry);
 
     const query = await prisma.query.create({
       data: {

@@ -45,6 +45,10 @@ function daysUntil(d: Date): number {
   return Math.max(0, Math.ceil((d.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
 }
 
+function isManualTrackingExpiry(expiresAt: Date): boolean {
+  return expiresAt.getUTCFullYear() >= 2099;
+}
+
 interface QueryWithSnapshots {
   query: {
     id: string;
@@ -135,7 +139,8 @@ export default async function ChartPage({ params }: Props) {
   const primary = await loadQueryWithSnapshots(id);
   if (!primary) notFound();
 
-  // Mark first view for 24h auto-cleanup
+  // Mark first view timestamp for lifecycle bookkeeping.
+  // (Unviewed-query cleanup is now only a legacy orphan safety net.)
   if (!primary.query.firstViewedAt) {
     await prisma.query.update({
       where: { id },
@@ -173,6 +178,7 @@ export default async function ChartPage({ params }: Props) {
   const isMultiRoute = allQueries.length > 1;
   const expired = new Date() > primary.query.expiresAt;
   const daysLeft = daysUntil(primary.query.expiresAt);
+  const manualTracking = isManualTrackingExpiry(primary.query.expiresAt);
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -245,6 +251,8 @@ export default async function ChartPage({ params }: Props) {
           <div className={styles.expiry}>
             {expired ? (
               <span className={styles.expiredBadge}>Expired</span>
+            ) : manualTracking ? (
+              <span className={styles.activeBadge}>Active (manual)</span>
             ) : (
               <span className={styles.activeBadge}>Expires in {daysLeft}d</span>
             )}
@@ -262,6 +270,10 @@ export default async function ChartPage({ params }: Props) {
         <div className={styles.expiredNotice}>
           <p>This tracker expired on {formatDate(primary.query.expiresAt)}.</p>
           <p>The data below is a snapshot of prices collected during the tracking period.</p>
+        </div>
+      ) : manualTracking ? (
+        <div className={styles.expiredNotice}>
+          <p>This tracker is active until you manually disable or delete it.</p>
         </div>
       ) : null}
 
