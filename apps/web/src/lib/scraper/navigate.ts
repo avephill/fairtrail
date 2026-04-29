@@ -88,13 +88,22 @@ export async function navigateGoogleFlights(
       // Wait for page to settle — randomized to look human
       await randomDelay(attempt === 1 ? 2000 : 4000, attempt === 1 ? 4000 : 7000);
 
-      // Dismiss consent/cookie dialog — Google renders two identical "Accept all"
-      // buttons; without .first() Playwright strict mode throws on the ambiguity
+      // Dismiss consent/cookie dialog — Google shows these in multiple languages and
+      // formats. Try each label in sequence; stop as soon as one is clicked.
+      // First check waits up to 4s for the overlay to appear after JS runs;
+      // subsequent checks are short since the dialog would have appeared by then.
+      const consentLabels = ['Accept all', 'I agree', 'Agree', 'Accept', 'Tout accepter', 'Alles akzeptieren', 'Aceptar todo', 'Continue', 'Got it'];
       try {
-        const consentButton = page.locator('button:has-text("Accept all")').first();
-        if (await consentButton.isVisible({ timeout: 2000 })) {
-          await consentButton.click();
-          await randomDelay(2000, 4000);
+        let firstCheck = true;
+        for (const label of consentLabels) {
+          const btn = page.locator(`button:has-text("${label}")`).first();
+          if (await btn.isVisible({ timeout: firstCheck ? 4000 : 500 })) {
+            await btn.click();
+            await randomDelay(2000, 4000);
+            console.log(`[navigate] dismissed consent dialog ("${label}")`);
+            break;
+          }
+          firstCheck = false;
         }
       } catch {
         // No consent dialog — continue
@@ -121,6 +130,20 @@ export async function navigateGoogleFlights(
       // of HTML but only ~3k of visible text, and flight data starts deep in the DOM
       // where a 50k char cap would never reach it
       const html = await page.evaluate(() => document.body.innerText);
+
+      // Validate that the captured text actually contains flight pricing data.
+      // [data-gs] can appear in the hidden underlying DOM even when a consent/cookie
+      // wall is covering the page, causing a false resultsFound=true. If there are
+      // no price patterns ($NNN, departure times, or duration strings) the page is
+      // almost certainly a consent wall, CAPTCHA, or empty shell — not flight results.
+      if (resultsFound) {
+        const hasFlightContent = /\$\s?\d|\d{1,2}:\d{2}\s*[AP]M|\d+\s*hr|\d+\s*h\b/.test(html);
+        if (!hasFlightContent) {
+          console.log(`[navigate] attempt ${attempt}: [data-gs] present but no flight content (${html.length} chars) — likely consent/captcha wall`);
+          resultsFound = false;
+        }
+      }
+
       console.log(`[navigate] attempt ${attempt}: resultsFound=${resultsFound}, textLength=${html.length}, elapsed=${Date.now() - attemptStart}ms`);
 
       await context.close();

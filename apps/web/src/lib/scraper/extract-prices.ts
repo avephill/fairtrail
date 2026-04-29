@@ -25,6 +25,75 @@ export interface QueryFilters {
 
 const DEFAULT_MAX_RESULTS = 10;
 
+function detectCurrencyCodeFromText(text: string): string {
+  if (text.includes('CurrencyEUR') || text.includes(' EUR') || text.includes('€')) return 'EUR';
+  if (text.includes('CurrencyGBP') || text.includes(' GBP') || text.includes('£')) return 'GBP';
+  if (text.includes('CurrencyJPY') || text.includes(' JPY') || text.includes('¥')) return 'JPY';
+  return 'USD';
+}
+
+function extractByRegexFallback(
+  html: string,
+  travelDateFallback: string,
+  searchUrl: string,
+  filters: QueryFilters,
+  maxResults: number,
+  currency: string | null
+): PriceData[] {
+  // Google Flights text blocks often have this shape:
+  // dep time -> arr time -> airline -> duration -> route -> stop info -> ... -> $price
+  const pattern = /(\d{1,2}:\d{2}\s*[AP]M)\s*[\r\n]+\s*[–-]\s*[\r\n]+\s*(\d{1,2}:\d{2}\s*[AP]M(?:\+\d+)?)\s*[\r\n]+([^\r\n$]{2,120})[\r\n]+(\d{1,2}\s*hr(?:\s*\d{1,2}\s*min)?)[\s\S]{0,220}?(Nonstop|(\d+)\s+stop(?:s)?)?[\s\S]{0,220}?\$([0-9][0-9,]*)/gi;
+  const inferredCurrency = currency ?? detectCurrencyCodeFromText(html);
+  const out: PriceData[] = [];
+  const seen = new Set<string>();
+
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(html)) !== null) {
+    const departureTime = m[1]?.trim() ?? null;
+    const arrivalTime = m[2]?.replace(/\+\d+$/, '').trim() ?? null;
+    const airlineRaw = m[3]?.trim() ?? '';
+    const duration = m[4]?.trim() ?? null;
+    const stopToken = m[5]?.trim() ?? '';
+    const stopCountToken = m[6]?.trim() ?? '';
+    const price = Number((m[7] ?? '').replace(/,/g, ''));
+
+    const airline = airlineRaw
+      .replace(/\s{2,}/g, ' ')
+      .replace(/Operated by.*/i, '')
+      .trim();
+    const stops = /nonstop/i.test(stopToken) ? 0 : Number(stopCountToken || '1');
+
+    if (!Number.isFinite(price) || price <= 0 || !airline) continue;
+    if (filters.maxPrice !== null && price > filters.maxPrice) continue;
+    if (filters.maxStops !== null && stops > filters.maxStops) continue;
+    if (
+      filters.preferredAirlines.length > 0 &&
+      !filters.preferredAirlines.some((a) => airline.toLowerCase().includes(a.toLowerCase()))
+    ) continue;
+
+    const key = `${airline}|${departureTime}|${arrivalTime}|${price}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    out.push({
+      travelDate: travelDateFallback,
+      price,
+      currency: inferredCurrency,
+      airline,
+      bookingUrl: searchUrl,
+      stops,
+      duration,
+      departureTime,
+      arrivalTime,
+      seatsLeft: null,
+    });
+  }
+
+  return out
+    .sort((a, b) => a.price - b.price)
+    .slice(0, Math.max(1, maxResults));
+}
+
 function buildSystemPrompt(filters: QueryFilters, maxResults: number, source: NavigationSource = 'google_flights', currency: string | null = null): string {
   const filterRules: string[] = [];
 
@@ -166,6 +235,13 @@ ${html}`;
 
   const jsonMatch = result.content.match(/\[[\s\S]*\]/);
   if (!jsonMatch) {
+    if (source === 'google_flights') {
+      const fallback = extractByRegexFallback(html, travelDateFallback, searchUrl, filters, maxResults, currency);
+      if (fallback.length > 0) {
+        console.log(`[extract] FALLBACK regex parse — ${fallback.length} flights`);
+        return { prices: fallback, usage: result.usage };
+      }
+    }
     console.log(`[extract] FAIL no_json_in_response — LLM returned no parseable JSON`);
     return { prices: [], usage: result.usage, failureReason: 'no_json_in_response' };
   }
@@ -173,6 +249,13 @@ ${html}`;
   const raw = JSON.parse(jsonMatch[0]) as PriceData[];
 
   if (raw.length === 0) {
+    if (source === 'google_flights') {
+      const fallback = extractByRegexFallback(html, travelDateFallback, searchUrl, filters, maxResults, currency);
+      if (fallback.length > 0) {
+        console.log(`[extract] FALLBACK regex parse after empty LLM output — ${fallback.length} flights`);
+        return { prices: fallback, usage: result.usage };
+      }
+    }
     console.log(`[extract] FAIL empty_extraction — LLM returned [] (${result.usage.inputTokens} input tokens)`);
     return { prices: [], usage: result.usage, failureReason: 'empty_extraction' };
   }

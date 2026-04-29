@@ -136,6 +136,36 @@ describe('extractPrices', () => {
     expect(result.failureReason).toBe('empty_extraction');
   });
 
+  it('falls back to regex extraction when llm returns empty array for google flights text', async () => {
+    mockExtract.mockResolvedValue({
+      content: '[]',
+      usage: { inputTokens: 500, outputTokens: 20 },
+    });
+
+    const gfText = `9:50 AM
+ – 
+5:30 PM
+Air Serbia
+13 hr 40 min
+NCE–JFK
+1 stop
+$589
+3:25 PM
+ – 
+10:25 PM
+Aer Lingus
+13 hr
+NCE–JFK
+1 stop
+$648`;
+
+    const result = await extractPrices(gfText, 'https://www.google.com/travel/flights?q=nce+jfk', '2026-06-25');
+    expect(result.failureReason).toBeUndefined();
+    expect(result.prices.length).toBeGreaterThan(0);
+    expect(result.prices[0]!.bookingUrl).toContain('google.com/travel/flights');
+    expect(result.prices[0]!.travelDate).toBe('2026-06-25');
+  });
+
   it('coerces null bookingUrl to empty string instead of passing null through', async () => {
     mockExtract.mockResolvedValue({
       content: JSON.stringify([
