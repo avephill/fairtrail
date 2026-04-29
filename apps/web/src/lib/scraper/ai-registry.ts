@@ -1,5 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 
+/** OpenAI-compatible SDK default can be short; local LLMs need long generations. */
+const OPENAI_COMPAT_TIMEOUT_MS = 600_000;
+
 export interface ExtractionUsage {
   inputTokens: number;
   outputTokens: number;
@@ -105,6 +108,7 @@ export const EXTRACTION_PROVIDERS: Record<string, ProviderConfig> = {
       const client = new OpenAI({
         apiKey: apiKey || 'unused',
         baseURL: options?.baseUrl || process.env.OPENAI_BASE_URL || undefined,
+        timeout: OPENAI_COMPAT_TIMEOUT_MS,
       });
       const response = await client.chat.completions.create({
         model,
@@ -135,7 +139,9 @@ export const EXTRACTION_PROVIDERS: Record<string, ProviderConfig> = {
       const { default: OpenAI } = await import('openai');
       const baseURL = options?.baseUrl
         || (process.env.OLLAMA_HOST ? process.env.OLLAMA_HOST + '/v1' : 'http://localhost:11434/v1');
-      const client = new OpenAI({ apiKey: 'unused', baseURL });
+      const client = new OpenAI({ apiKey: 'unused', baseURL, timeout: OPENAI_COMPAT_TIMEOUT_MS });
+      // Ollama-only: Qwen3 “thinking” mode adds long hidden reasoning; Fairtrail needs fast JSON.
+      // See https://github.com/ollama/ollama/issues/14617 — other OpenAI-compat servers ignore unknown fields.
       const response = await client.chat.completions.create({
         model,
         messages: [
@@ -143,6 +149,9 @@ export const EXTRACTION_PROVIDERS: Record<string, ProviderConfig> = {
           { role: 'user', content: userPrompt },
         ],
         max_tokens: 8192,
+        // Ollama Qwen3 extension — not in OpenAI typings; harmless for other servers.
+        // @ts-expect-error think is supported by Ollama for Qwen3 family
+        think: false,
       });
 
       return {
@@ -164,7 +173,7 @@ export const EXTRACTION_PROVIDERS: Record<string, ProviderConfig> = {
     extract: async (_apiKey, model, systemPrompt, userPrompt, options) => {
       const { default: OpenAI } = await import('openai');
       const baseURL = options?.baseUrl || 'http://localhost:8080/v1';
-      const client = new OpenAI({ apiKey: 'unused', baseURL });
+      const client = new OpenAI({ apiKey: 'unused', baseURL, timeout: OPENAI_COMPAT_TIMEOUT_MS });
       const response = await client.chat.completions.create({
         model,
         messages: [
@@ -193,7 +202,7 @@ export const EXTRACTION_PROVIDERS: Record<string, ProviderConfig> = {
     extract: async (_apiKey, model, systemPrompt, userPrompt, options) => {
       const { default: OpenAI } = await import('openai');
       const baseURL = options?.baseUrl || 'http://localhost:8000/v1';
-      const client = new OpenAI({ apiKey: 'unused', baseURL });
+      const client = new OpenAI({ apiKey: 'unused', baseURL, timeout: OPENAI_COMPAT_TIMEOUT_MS });
       const response = await client.chat.completions.create({
         model,
         messages: [
