@@ -145,6 +145,22 @@ model PreviewRun {
   @@index([requestHash, status, expiresAt])
 }
 
+model ParseRun {
+  id             String   @id @default(cuid())
+  queryHash      String
+  status         String   @default("pending") // 'pending' | 'running' | 'completed' | 'failed'
+  requestPayload Json
+  resultPayload  Json?
+  error          String?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([expiresAt])
+  @@index([queryHash, status, expiresAt])
+}
+
 model CommunityApiKey {
   id            String    @id @default(cuid())
   apiKey        String    @unique
